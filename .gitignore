@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated output
+*.epub
+cover.png
+transcript.md
+
+# OS
+.DS_Store
