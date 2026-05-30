@@ -2,6 +2,9 @@
 
 Turn a YouTube video or a raw timestamped transcript into a clean, readable **EPUB** book — speakers detected, timestamps stripped, paragraphs reflowed, cover generated.
 
+<img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/809a265e-e607-413f-a903-4516c9c5f1e4" />
+<img width="1108" height="830" alt="image" src="https://github.com/user-attachments/assets/b4a14df1-a82f-4053-9fe3-deba4d1f6923" />
+
 Works as a standalone Python script or as a [Claude Code](https://docs.claude.com/en/docs/claude-code) skill (`SKILL.md` included).
 
 ## What it does
