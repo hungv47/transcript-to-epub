@@ -228,6 +228,10 @@ def clean_transcript(content: str) -> str:
         stripped = line.strip()
         if not stripped or stripped.startswith("# "):
             continue
+        # Drop a previously-injected metadata header so re-running on an
+        # already-built transcript.md doesn't duplicate the speakers line.
+        if stripped.startswith("**Speakers:**"):
+            continue
 
         m = re.match(r"^\*\*\d+:\d{2}:\d{2}\*\*:\s*(.*)", stripped)
         if m:
@@ -354,24 +358,107 @@ def _cover_pillow(title: str, speakers: str, output_path: str) -> bool:
 # ---------------------------------------------------------------------------
 
 def build_css() -> str:
-    """Return default EPUB CSS."""
-    return """
+    """Return default EPUB CSS — warm reading page, justified prose,
+    print-style paragraph indents, and italic lime-keylined blockquotes
+    for interviewer questions (FORSVN brand tokens)."""
+    return """@charset "UTF-8";
+/* ===== transcript-to-epub default stylesheet ===== */
+
+/* Body: warm off-white, comfortable reading measure */
 body {
-  font-family: Georgia, serif;
-  line-height: 1.6;
-  margin: 1em;
+  font-family: Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+  font-size: 1em;
+  line-height: 1.65;
   color: #1a1a1a;
+  background-color: #faf8f3;
+  margin: 0 5%;
+  text-align: justify;
+  -webkit-hyphens: auto;
+  -epub-hyphens: auto;
+  hyphens: auto;
+  orphans: 2;
+  widows: 2;
 }
-h1 {
-  font-size: 1.8em;
-  margin-top: 2em;
-  margin-bottom: 0.5em;
-  text-align: center;
-}
+
+/* Paragraphs: indented continuation style, like print books */
 p {
-  margin-bottom: 0.8em;
+  margin: 0;
+  text-indent: 1.4em;
+  hyphens: auto;
+}
+
+/* First paragraph after a heading or break: no indent */
+h1 + p, h2 + p, h3 + p,
+.no-indent,
+p.first,
+hr + p {
   text-indent: 0;
 }
+
+/* Headings */
+h1, h2, h3 {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0C1211;
+  text-indent: 0;
+  text-align: left;
+}
+
+h1 {
+  font-size: 1.9em;
+  margin: 1.2em 0 0.8em;
+}
+
+h2 {
+  font-size: 1.4em;
+  margin: 1.6em 0 0.6em;
+  padding-bottom: 0.2em;
+  border-bottom: 2px solid #B7FF6E;
+}
+
+h3 {
+  font-size: 1.15em;
+  margin: 1.4em 0 0.4em;
+  color: #004700;
+}
+
+/* ===== Speaker / interviewer treatment ===== */
+/* Interviewer questions: italic, inset, lime keyline */
+blockquote {
+  margin: 1.4em 0;
+  padding: 0.2em 0 0.2em 1.1em;
+  border-left: 3px solid #B7FF6E;
+  font-style: italic;
+  color: #2a2a2a;
+  text-indent: 0;
+}
+
+blockquote p {
+  text-indent: 0;
+  margin: 0 0 0.6em 0;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+/* The "Speakers:" line under the title */
+p strong:first-child {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* Horizontal rule as section divider */
+hr {
+  border: none;
+  border-top: 1px solid #d8d4c8;
+  width: 30%;
+  margin: 2em auto;
+}
+
+/* Cover */
+.cover-wrap { text-align: center; margin: 0; padding: 0; }
+.cover-wrap img { max-width: 100%; height: auto; }
 """
 
 
@@ -438,6 +525,8 @@ def parse_args():
         help="Input markdown file or YouTube URL/video ID",
     )
     parser.add_argument("--title", default=None, help="Book title (default: from filename or video)")
+    parser.add_argument("--speakers", default=None,
+                        help="Override speaker/author byline (default: auto-detected from >> markers)")
     parser.add_argument("--cover", default=None, help="Path to custom cover image")
     parser.add_argument("--cover-method", default="auto", choices=["auto", "pillow", "none"],
                         help="Cover generation: auto/pillow (Pillow) or none (default: auto)")
@@ -457,12 +546,12 @@ def main():
         input_path = input_path.resolve()
         content = input_path.read_text(encoding="utf-8")
         title = args.title or extract_title(content, str(input_path))
-        speakers = detect_speakers(content)
+        speakers = args.speakers or detect_speakers(content)
         default_output_dir = input_path.parent
     elif is_youtube_url(args.input):
         title, channel, raw_transcript = fetch_youtube_transcript(args.input, language=args.language)
         title = args.title or title
-        speakers = channel
+        speakers = args.speakers or channel
         content = f"# {title}\n\n{raw_transcript}"
         slug = re.sub(r"[^\w\s-]", "", title).strip().replace(" ", "-").lower()[:60]
         default_output_dir = Path.cwd() / (slug or "transcript")
