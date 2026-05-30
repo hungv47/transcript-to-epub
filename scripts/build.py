@@ -7,12 +7,18 @@ Supports:
     - YouTube URLs (auto-fetches transcript + channel name)
 
 Usage:
-    python3 build.py <input.md|youtube-url> [--title TITLE] [--cover PATH] [--cover-method METHOD] [--output DIR] [--css PATH]
+    python3 build.py <input.md|youtube-url> [--title TITLE] [--speakers NAMES]
+        [--source-url URL] [--cover PATH]
+        [--cover-method auto|pillow|prompt|none] [--output DIR] [--css PATH]
+        [--language CODE]
+
+Outputs (both, always): a clean Markdown book (book.md) AND a designed book.epub.
+Both begin with an attribution front-matter block that credits the original source.
 
 Speaker/author is auto-detected:
     - YouTube: channel name from video page
     - Transcripts: speaker names from >> markers
-    - Fallback: "Various Speakers"
+    - Fallback: "the original creators"
 
 Requirements:
     - pandoc
@@ -40,6 +46,17 @@ try:
     HAS_YT_API = True
 except ImportError:
     HAS_YT_API = False
+
+
+# HTML-comment markers wrapping the attribution front-matter block. pandoc
+# drops HTML comments, so they are invisible in the EPUB while still letting
+# clean_transcript() recognize (and skip) an already-assembled book on re-runs.
+ATTRIBUTION_START = "<!-- t2e:attribution:start -->"
+ATTRIBUTION_END = "<!-- t2e:attribution:end -->"
+
+# Fallback credit when no creator/channel name is known. Credit is never
+# silently dropped — at worst it degrades to this generic phrase.
+UNKNOWN_CREATORS = "the original creators"
 
 
 # ---------------------------------------------------------------------------
@@ -73,10 +90,15 @@ def is_youtube_url(text: str) -> bool:
     return extract_video_id(text) is not None
 
 
-def fetch_youtube_transcript(url: str, language: str = "en") -> tuple[str, str, str]:
+def canonical_youtube_url(video_id: str) -> str:
+    """Return the canonical watch URL for a YouTube video id."""
+    return f"https://www.youtube.com/watch?v={video_id}"
+
+
+def fetch_youtube_transcript(url: str, language: str = "en") -> tuple[str, str, str, str]:
     """
     Fetch transcript from YouTube URL.
-    Returns (title, channel_name, transcript_text).
+    Returns (title, channel_name, transcript_text, source_url).
     """
     if not HAS_YT_API:
         print("Error: youtube-transcript-api not installed.", file=sys.stderr)
@@ -114,7 +136,7 @@ def fetch_youtube_transcript(url: str, language: str = "en") -> tuple[str, str, 
         timestamp = f"**{hours:02d}:{minutes:02d}:{seconds:02d}**"
         lines.append(f"{timestamp}: {entry.text}")
 
-    return title, channel, "\n".join(lines)
+    return title, channel, "\n".join(lines), canonical_youtube_url(video_id)
 
 
 def _fetch_video_metadata(video_id: str) -> tuple[str, str]:
@@ -222,14 +244,30 @@ def clean_transcript(content: str) -> str:
 
     Plain prose is retained so an untimestamped transcript still produces a
     book instead of an empty file.
+
+    Idempotent re-runs: if a marker-delimited attribution block is present
+    (from a previously assembled book), every line from ``ATTRIBUTION_START``
+    through ``ATTRIBUTION_END`` is skipped so the front-matter is not folded
+    back into the body and duplicated by ``assemble_book``.
     """
     segments = []
+    in_attribution = False
     for line in content.split("\n"):
         stripped = line.strip()
+
+        # Skip a previously-assembled attribution block in its entirety.
+        if not in_attribution and stripped == ATTRIBUTION_START:
+            in_attribution = True
+            continue
+        if in_attribution:
+            if stripped == ATTRIBUTION_END:
+                in_attribution = False
+            continue
+
         if not stripped or stripped.startswith("# "):
             continue
         # Drop a previously-injected metadata header so re-running on an
-        # already-built transcript.md doesn't duplicate the speakers line.
+        # already-built book doesn't duplicate the speakers line.
         if stripped.startswith("**Speakers:**"):
             continue
 
@@ -273,6 +311,49 @@ def clean_transcript(content: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Book assembly (attribution front-matter + body)
+# ---------------------------------------------------------------------------
+
+def build_attribution(title: str, creators: str, source_url: str | None) -> str:
+    """Return the attribution front-matter block, wrapped in HTML-comment
+    markers so it is idempotently re-detected and invisible in the EPUB.
+
+    Credit is never silently dropped: an empty/unknown ``creators`` degrades
+    to "the original creators"; an unknown ``source_url`` only omits the URL
+    line (and the URL clause of the disclaimer)."""
+    creators = (creators or "").strip() or UNKNOWN_CREATORS
+    source_url = (source_url or "").strip() or None
+
+    lines = [
+        ATTRIBUTION_START,
+        f"# {title}",
+        "",
+        f"An unofficial reading edition of a conversation by {creators}.",
+    ]
+    if source_url:
+        lines.append("")
+        lines.append(f"Original source: {source_url}")
+
+    disclaimer = (
+        f"This is an unofficial reading edition. All rights to the original "
+        f"material belong to {creators}. This edition claims no copyright over "
+        f"the source content."
+    )
+    if source_url:
+        disclaimer += f" Please support the creators at {source_url}."
+    lines.extend(["", f"> {disclaimer}", "", ATTRIBUTION_END])
+    return "\n".join(lines)
+
+
+def assemble_book(title: str, creators: str, source_url: str | None, body: str) -> str:
+    """Compose the full Markdown book: attribution front-matter then body.
+
+    ``body`` is the output of ``clean_transcript`` (paragraphs only, no
+    title/byline), so the assembled title is never double-emitted."""
+    return f"{build_attribution(title, creators, source_url)}\n\n{body}"
+
+
+# ---------------------------------------------------------------------------
 # Title extraction
 # ---------------------------------------------------------------------------
 
@@ -289,10 +370,33 @@ def extract_title(content: str, filepath: str) -> str:
 # ---------------------------------------------------------------------------
 
 def generate_cover(title: str, speakers: str, output_path: str, method: str = "auto") -> bool:
-    """Render a cover with Pillow. ``method="none"`` skips it."""
-    if method == "none":
+    """Render a cover with Pillow. ``method="none"`` and ``"prompt"`` skip it.
+
+    ``"prompt"`` is handled in ``main`` (it emits an image-gen prompt and
+    continues without a cover); here it simply renders nothing."""
+    if method in ("none", "prompt"):
         return False
     return _cover_pillow(title, speakers, output_path)
+
+
+def cover_prompt(title: str, creators: str) -> str:
+    """Return a ready-to-paste, brand-aligned image-generation prompt for a
+    book cover. Works without Pillow — it is pure text."""
+    return (
+        f"Design a square-ish portrait book cover (roughly 2:3 ratio).\n"
+        f"Title: \"{title}\"\n"
+        f"Byline / creators: {creators}\n\n"
+        f"Style:\n"
+        f"- Dark ink background, hex #0C1211 (never pure black), matte finish.\n"
+        f"- A single signal-lime accent, hex #B7FF6E, used sparingly (a rule, "
+        f"keyline, or small mark) — under ~10% of the pixels.\n"
+        f"- Set the title large in a clean geometric sans serif, near-white text.\n"
+        f"- Set the byline smaller, muted grey, below the title.\n"
+        f"- Calm, editorial, high-contrast, lots of negative space.\n"
+        f"- NO purple/blue AI gradients, NO glassy/frosted panels, NO neon glow, "
+        f"NO stock photography.\n\n"
+        f"Export a PNG or JPEG, then re-run the build with: --cover <your-image>"
+    )
 
 
 def _load_cover_font(size: int):
@@ -466,22 +570,59 @@ hr {
 # EPUB builder
 # ---------------------------------------------------------------------------
 
+def build_rights(creators: str, source_url: str | None) -> str:
+    """Return the pandoc ``rights``/``description`` string: names the source
+    and states non-ownership of the original material."""
+    creators = (creators or "").strip() or UNKNOWN_CREATORS
+    source_url = (source_url or "").strip() or None
+    src = source_url or creators
+    return (
+        f"Unofficial reading edition. Source: {src}. All rights to the "
+        f"original material belong to {creators}; this edition claims no "
+        f"copyright over the source content."
+    )
+
+
 def build_epub(
     md_path: str,
     output_path: str,
     title: str,
     speakers: str,
+    source_url: str | None = None,
     cover_path: str | None = None,
     css_path: str | None = None,
 ) -> str:
     """Run pandoc to build the EPUB. Returns the output path."""
+    rights = build_rights(speakers, source_url)
+
+    # Feed pandoc a copy with the attribution comment markers removed. The
+    # markers stay in the book.md deliverable (clean_transcript needs them to
+    # de-dupe front-matter on re-runs), but to pandoc an HTML comment is still a
+    # block-level token: a comment wedged between the title H1 and its body makes
+    # pandoc start a second level-1 section and re-emit the title, rendering it
+    # twice. Stripping just the two marker lines collapses it to one clean
+    # chapter (one title H1, then attribution, then the transcript).
+    src_md = Path(md_path).read_text(encoding="utf-8")
+    pandoc_md = "\n".join(
+        line for line in src_md.split("\n")
+        if line.strip() not in (ATTRIBUTION_START, ATTRIBUTION_END)
+    )
+    fd_md, tmp_md = tempfile.mkstemp(prefix="t2e-", suffix=".md")
+    with os.fdopen(fd_md, "w") as f:
+        f.write(pandoc_md)
+
     cmd = [
         "pandoc",
-        md_path,
+        tmp_md,
         "-o", output_path,
         "--metadata", f"title={title}",
         "--metadata", f"author={speakers}",
         "--metadata", "lang=en",
+        "--metadata", f"rights={rights}",
+        "--metadata", f"description={rights}",
+        # The book already opens with the title as an H1, so suppress pandoc's
+        # separate auto-generated title page (would otherwise repeat the title).
+        "--epub-title-page=false",
         "--toc",
         "--toc-depth=1",
         "--split-level=2",
@@ -502,8 +643,9 @@ def build_epub(
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
     finally:
-        if tmp_css and os.path.exists(tmp_css):
-            os.unlink(tmp_css)
+        for tmp in (tmp_md, tmp_css):
+            if tmp and os.path.exists(tmp):
+                os.unlink(tmp)
 
     if result.returncode != 0:
         print(f"Error: pandoc failed: {result.stderr}", file=sys.stderr)
@@ -527,9 +669,15 @@ def parse_args():
     parser.add_argument("--title", default=None, help="Book title (default: from filename or video)")
     parser.add_argument("--speakers", default=None,
                         help="Override speaker/author byline (default: auto-detected from >> markers)")
+    parser.add_argument("--source-url", default=None,
+                        help="Link to the original source for attribution "
+                             "(YouTube input defaults to the canonical watch URL)")
     parser.add_argument("--cover", default=None, help="Path to custom cover image")
-    parser.add_argument("--cover-method", default="auto", choices=["auto", "pillow", "none"],
-                        help="Cover generation: auto/pillow (Pillow) or none (default: auto)")
+    parser.add_argument("--cover-method", default="auto",
+                        choices=["auto", "pillow", "prompt", "none"],
+                        help="Cover: auto/pillow (Pillow-generated), prompt "
+                             "(print an image-gen prompt, build without a cover), "
+                             "or none (default: auto)")
     parser.add_argument("--output", default=None, help="Output directory")
     parser.add_argument("--css", default=None, help="Custom CSS file")
     parser.add_argument("--language", default="en", help="Language code for YouTube transcript (default: en)")
@@ -547,11 +695,15 @@ def main():
         content = input_path.read_text(encoding="utf-8")
         title = args.title or extract_title(content, str(input_path))
         speakers = args.speakers or detect_speakers(content)
+        source_url = args.source_url  # optional for file input
         default_output_dir = input_path.parent
     elif is_youtube_url(args.input):
-        title, channel, raw_transcript = fetch_youtube_transcript(args.input, language=args.language)
+        title, channel, raw_transcript, canonical_url = fetch_youtube_transcript(
+            args.input, language=args.language
+        )
         title = args.title or title
         speakers = args.speakers or channel
+        source_url = args.source_url or canonical_url
         content = f"# {title}\n\n{raw_transcript}"
         slug = re.sub(r"[^\w\s-]", "", title).strip().replace(" ", "-").lower()[:60]
         default_output_dir = Path.cwd() / (slug or "transcript")
@@ -560,29 +712,40 @@ def main():
               file=sys.stderr)
         sys.exit(1)
 
+    # Creators credit for attribution/author metadata uses the full byline
+    # (never the silently-dropped fallback) — empty degrades to UNKNOWN_CREATORS.
+    creators = (speakers or "").strip() or UNKNOWN_CREATORS
+
     print(f"Title:    {title}")
-    print(f"Speakers: {speakers}")
+    print(f"Speakers: {creators}")
+    if source_url:
+        print(f"Source:   {source_url}")
 
     output_dir = Path(args.output).resolve() if args.output else default_output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Clean transcript
+    # Clean transcript into body paragraphs, then assemble with attribution.
     print("Cleaning transcript...")
-    cleaned = clean_transcript(content)
+    body = clean_transcript(content)
+    book_md = assemble_book(title, creators, source_url, body)
 
-    # Write cleaned markdown
-    md_output = output_dir / "transcript.md"
-    header = f"# {title}\n\n**Speakers:** {speakers}\n\n"
-    md_output.write_text(header + cleaned, encoding="utf-8")
+    # Write the assembled clean book (attribution front-matter + body).
+    md_output = output_dir / "book.md"
+    md_output.write_text(book_md, encoding="utf-8")
     print(f"Wrote:    {md_output}")
 
-    # Generate or copy cover
+    # Cover: explicit --cover wins; otherwise honor --cover-method.
     cover_path = args.cover
     if not cover_path:
-        auto_cover = output_dir / "cover.png"
-        if generate_cover(title, speakers, str(auto_cover), method=args.cover_method):
-            cover_path = str(auto_cover)
-            print(f"Wrote:    {cover_path}")
+        if args.cover_method == "prompt":
+            print("\n--- Cover image prompt (paste into any AI image tool) ---")
+            print(cover_prompt(title, creators))
+            print("--- Building without a cover; re-run with --cover <image> ---\n")
+        else:
+            auto_cover = output_dir / "cover.png"
+            if generate_cover(title, creators, str(auto_cover), method=args.cover_method):
+                cover_path = str(auto_cover)
+                print(f"Wrote:    {cover_path}")
 
     # Build EPUB
     epub_output = output_dir / "book.epub"
@@ -591,7 +754,8 @@ def main():
         md_path=str(md_output),
         output_path=str(epub_output),
         title=title,
-        speakers=speakers,
+        speakers=creators,
+        source_url=source_url,
         cover_path=cover_path,
         css_path=args.css,
     )
