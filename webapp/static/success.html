@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your book is ready — TalkToBook</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="wordmark" href="/">Talk<span>To</span>Book</a>
+    <nav><a class="btn btn-ghost" href="/">Make another</a></nav>
+  </header>
+
+  <section class="section" style="max-width:680px;">
+    <div class="card result">
+      <span class="result-tag">Payment received</span>
+      <h1 id="title" style="font-size:1.8rem;margin:.3em 0 .2em;">Building your edition…</h1>
+      <p id="status" class="result-meta">Removing the watermark and rendering EPUB, PDF, and Kindle. This takes a few seconds.</p>
+      <div id="downloads" class="upsell" hidden>
+        <h4>Your downloads</h4>
+        <p id="download-links" style="font-size:1.05rem;line-height:2.2;"></p>
+        <p class="watermark-note">Bookmark this page — your link works for this book.</p>
+      </div>
+      <p id="error" class="form-error" hidden></p>
+    </div>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const jobId = params.get("job");
+    const sessionId = params.get("session_id");
+    const KINDS = { epub: "EPUB", pdf: "PDF", azw3: "Kindle (AZW3)" };
+
+    async function poll(tries = 0) {
+      if (!jobId) { fail("Missing job reference."); return; }
+      try {
+        const url = `/api/job/${jobId}` + (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "");
+        const job = await (await fetch(url)).json();
+        document.getElementById("title").textContent = job.title || "Your book";
+        if (job.paid && job.downloads) { show(job); return; }
+      } catch (_) {}
+      if (tries > 30) { fail("Still processing — refresh in a moment, or check the email we sent."); return; }
+      setTimeout(() => poll(tries + 1), 2000);
+    }
+    function show(job) {
+      document.getElementById("status").textContent = "Done. Your clean, branded edition is ready.";
+      const links = Object.entries(job.downloads)
+        .map(([k, u]) => `<a class="btn btn-primary" style="margin:4px" href="${u}" download>${KINDS[k] || k}</a>`)
+        .join(" ");
+      document.getElementById("download-links").innerHTML = links;
+      document.getElementById("downloads").hidden = false;
+    }
+    function fail(msg) {
+      const e = document.getElementById("error");
+      e.textContent = msg; e.hidden = false;
+      document.getElementById("status").textContent = "";
+    }
+    poll();
+  </script>
+</body>
+</html>

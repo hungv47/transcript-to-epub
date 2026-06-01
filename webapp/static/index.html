@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TalkToBook — Turn your podcast, talk, or interview into a Kindle-ready book</title>
+  <meta name="description" content="Paste a transcript, get a designed, Kindle-ready ebook. Free preview, $9 to unlock the clean, branded edition with EPUB, PDF, and Kindle formats." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="wordmark" href="/">Talk<span>To</span>Book</a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#examples">Examples</a>
+      <a href="#pricing">Pricing</a>
+      <a class="btn btn-ghost" href="#start">Start free</a>
+    </nav>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-inner">
+      <p class="kicker">For podcasters, speakers &amp; creators</p>
+      <h1>Turn your podcast, talk, or interview into a <span class="accent">Kindle-ready book</span>.</h1>
+      <p class="lede">
+        Paste a transcript of <em>your own</em> spoken content and get a calm, designed ebook —
+        cleaned, laid out, and ready to read. Preview it free. Pay once to unlock the
+        clean, branded, Kindle-ready edition.
+      </p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#start">Make my book — free preview</a>
+        <span class="cta-note">No account. No card to preview.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section id="how" class="section">
+    <h2 class="section-title">Three steps, about a minute</h2>
+    <ol class="steps">
+      <li>
+        <span class="step-num">1</span>
+        <h3>Paste or upload</h3>
+        <p>Drop in a transcript — <code>.txt</code>, <code>.md</code>, <code>.srt</code>, or <code>.vtt</code>. Timestamps and filler get cleaned automatically.</p>
+      </li>
+      <li>
+        <span class="step-num">2</span>
+        <h3>Preview free</h3>
+        <p>We build a real EPUB you can open and read — designed pages, a cover, the works. No card required.</p>
+      </li>
+      <li>
+        <span class="step-num">3</span>
+        <h3>Unlock &amp; publish</h3>
+        <p>Pay once to remove branding, set your cover &amp; accent, and download EPUB + PDF + Kindle.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Examples -->
+  <section id="examples" class="section section-muted">
+    <h2 class="section-title">From rambling transcript to clean page</h2>
+    <p class="section-sub">Honest before/after — the engine cleans timestamps, merges fragments into paragraphs, and sets interviewer turns apart. It won't rewrite your ideas.</p>
+    <div class="ba">
+      <div class="ba-card">
+        <span class="ba-tag">Before — raw transcript</span>
+        <pre class="ba-raw">**00:00:00**: &gt;&gt; Ada: Welcome back. Today we're
+talking about how good tools quietly
+disappear into the work.
+**00:00:08**: &gt;&gt; Ada: The best ones never ask
+for attention. You just reach for them.
+**00:00:15**: &gt;&gt; Grace: Right. A tool earns trust
+by being boring in the best way.</pre>
+      </div>
+      <div class="ba-card">
+        <span class="ba-tag ba-tag-after">After — designed page</span>
+        <div class="ba-page">
+          <h4>A Short Conversation on Craft</h4>
+          <p class="byline">by Ada &amp; Grace</p>
+          <p>Welcome back. Today we're talking about how good tools quietly disappear into the work. The best ones never ask for attention. You just reach for them.</p>
+          <blockquote>Right. A tool earns trust by being boring in the best way.</blockquote>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- The app -->
+  <section id="start" class="section">
+    <h2 class="section-title">Make your book</h2>
+    <div class="app">
+      <form id="preview-form" class="card form">
+        <div class="grid-2">
+          <label class="field">
+            <span>Book title</span>
+            <input type="text" name="title" placeholder="e.g. A Short Conversation on Craft" />
+          </label>
+          <label class="field">
+            <span>Author / byline</span>
+            <input type="text" name="author" placeholder="e.g. Ada &amp; Grace" />
+          </label>
+        </div>
+        <label class="field">
+          <span>Source link <small>(optional — your show / channel)</small></span>
+          <input type="url" name="source_url" placeholder="https://…" />
+        </label>
+
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab active" data-tab="paste" role="tab">Paste transcript</button>
+          <button type="button" class="tab" data-tab="upload" role="tab">Upload a file</button>
+        </div>
+
+        <div class="tab-panel" data-panel="paste">
+          <label class="field">
+            <span class="sr-only">Transcript</span>
+            <textarea name="transcript" rows="9" placeholder="Paste your transcript here. Timestamps like **00:00:08** and >> Speaker: markers are handled automatically."></textarea>
+          </label>
+        </div>
+        <div class="tab-panel hidden" data-panel="upload">
+          <label class="field dropzone">
+            <input type="file" name="file" accept=".txt,.md,.markdown,.srt,.vtt" />
+            <span class="dz-text">Choose a <strong>.txt / .md / .srt / .vtt</strong> file</span>
+          </label>
+        </div>
+
+        <label class="checkbox">
+          <input type="checkbox" name="owns" />
+          <span>I own or have the rights to this content.</span>
+        </label>
+
+        <button type="submit" class="btn btn-primary btn-block">Generate free preview</button>
+        <p class="form-error" id="preview-error" hidden></p>
+      </form>
+
+      <!-- Result -->
+      <div id="result" class="card result hidden">
+        <div class="result-head">
+          <div>
+            <span class="result-tag">Free preview ready</span>
+            <h3 id="result-title">Your book</h3>
+            <p id="result-meta" class="result-meta"></p>
+          </div>
+          <a id="download-preview" class="btn btn-ghost" download>Download preview EPUB</a>
+        </div>
+        <p class="watermark-note">Your preview carries a small “Made with TalkToBook” colophon and a plain cover. Unlock below to remove it.</p>
+
+        <!-- Upsell -->
+        <div class="upsell">
+          <div class="upsell-head">
+            <h4>Unlock the clean, branded edition</h4>
+            <span class="price" id="price">$9</span>
+          </div>
+          <ul class="upsell-list">
+            <li>Watermark &amp; branding removed</li>
+            <li>Your cover image and accent colour</li>
+            <li>EPUB <strong>+ PDF + Kindle (AZW3)</strong></li>
+            <li>One-time payment — no subscription</li>
+          </ul>
+          <form id="unlock-form" class="unlock-form">
+            <div class="grid-2">
+              <label class="field">
+                <span>Email <small>(for your download link)</small></span>
+                <input type="email" name="email" placeholder="you@example.com" />
+              </label>
+              <label class="field">
+                <span>Accent colour</span>
+                <input type="color" name="accent" value="#B7FF6E" />
+              </label>
+            </div>
+            <label class="field">
+              <span>Cover image <small>(optional — PNG/JPG, ~2:3)</small></span>
+              <input type="file" name="cover" accept=".png,.jpg,.jpeg" />
+            </label>
+            <button type="submit" class="btn btn-primary btn-block" id="unlock-btn">Unlock for <span id="unlock-price">$9</span></button>
+            <p class="upsell-msg" id="unlock-msg" hidden></p>
+            <details class="cover-prompt-wrap">
+              <summary>No cover yet? Get an AI cover prompt</summary>
+              <pre id="cover-prompt" class="cover-prompt"></pre>
+            </details>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section id="pricing" class="section section-muted">
+    <h2 class="section-title">Simple pricing</h2>
+    <div class="pricing">
+      <div class="plan">
+        <h3>Free preview</h3>
+        <p class="plan-price">$0</p>
+        <ul>
+          <li>Full clean reading text</li>
+          <li>Designed EPUB</li>
+          <li>Plain auto cover</li>
+          <li class="muted">“Made with TalkToBook” colophon</li>
+        </ul>
+      </div>
+      <div class="plan plan-feature">
+        <span class="plan-badge">Most popular</span>
+        <h3>Single unlock</h3>
+        <p class="plan-price"><span id="plan-price">$9</span> <small>one-time</small></p>
+        <ul>
+          <li>Everything in preview</li>
+          <li>Branding removed</li>
+          <li>Your cover &amp; accent</li>
+          <li><strong>EPUB + PDF + Kindle</strong></li>
+        </ul>
+        <a class="btn btn-primary" href="#start">Start free, unlock when ready</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="section faq">
+    <h2 class="section-title">Questions</h2>
+    <details><summary>Does it read like a real book?</summary><p>The engine strips timestamps and filler and merges spoken fragments into paragraphs with proper typography. Spoken content is still spoken content — it won't invent structure your talk didn't have. Light AI restructuring is on the roadmap.</p></details>
+    <details><summary>Can I use any YouTube video?</summary><p>This is for content you own or have the rights to — you confirm that before generating. It's a tool for creators repurposing their own work, not for ripping other people's videos.</p></details>
+    <details><summary>I only have audio, not a transcript.</summary><p>Transcribe it first (most podcast hosts and tools export one), then paste it here. Built-in transcription is the next thing on our list.</p></details>
+    <details><summary>What formats do I get?</summary><p>The free preview is EPUB. Unlocking adds PDF and Kindle (AZW3) alongside a clean, branded EPUB.</p></details>
+  </section>
+
+  <footer class="site-footer">
+    <span class="wordmark">Talk<span>To</span>Book</span>
+    <p>Turn your podcast, talk, or interview into a Kindle-ready book.</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
