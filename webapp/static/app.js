@@ -28,7 +28,16 @@ async function loadConfig() {
         err.hidden = false;
       }
     }
+    applyPaymentMode();
   } catch (_) { /* defaults are fine */ }
+}
+
+// Keep the unlock CTA honest: when Polar isn't wired yet, a click captures
+// interest rather than charging, so don't promise an instant subscription.
+function applyPaymentMode() {
+  if (CONFIG.payments_enabled) return;
+  const btn = document.getElementById("unlock-btn");
+  if (btn) btn.textContent = "Join the creator-plan waitlist";
 }
 
 function esc(s) {
@@ -135,4 +144,27 @@ function renderDownloads(downloads) {
   msg.hidden = false;
 }
 
+// A canceled Polar checkout returns the visitor to /?canceled=<job_id>. Restore
+// their preview and unlock panel instead of dropping them on a blank homepage.
+async function restoreCanceledJob() {
+  const jobId = new URLSearchParams(location.search).get("canceled");
+  if (!jobId) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  try {
+    const res = await fetch(`/api/job/${encodeURIComponent(jobId)}`);
+    if (!res.ok) return;
+    const job = await res.json();
+    if (!job || !job.preview) return;
+    CURRENT_JOB = job;
+    renderResult(job);
+    const msg = $("#unlock-msg");
+    if (msg) {
+      msg.textContent = "Checkout canceled. Your preview is still here whenever you're ready.";
+      msg.classList.remove("err");
+      msg.hidden = false;
+    }
+  } catch (_) { /* leave the page as-is */ }
+}
+
 loadConfig();
+restoreCanceledJob();
