@@ -1,0 +1,19 @@
+# Build context is the repo root (Dockerfile copies scripts/ + webapp/).
+.git
+.gitignore
+.forsvn
+.DS_Store
+**/.DS_Store
+**/__pycache__
+**/*.pyc
+webapp/.venv
+webapp/jobs
+webapp/.env
+*.epub
+*.local.md
+PRD.local.md
+PRODUCT.local.md
+README.md
+LICENSE
+SKILL.md
+examples

@@ -7,13 +7,18 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PORT=8000
 
-# pandoc (EPUB), WeasyPrint runtime libs (PDF), fonts, calibre (Kindle AZW3).
-# calibre is ~large; drop the apt line below if you don't need Kindle output.
+# pandoc (EPUB) + WeasyPrint runtime libs (PDF) + fonts are always installed.
+# Calibre (Kindle AZW3) is large and only needed for the paid Kindle format;
+# gate it behind a build arg so the validation image stays lean. Enable with
+# --build-arg INSTALL_CALIBRE=true (or set it in your host's build settings).
+ARG INSTALL_CALIBRE=false
 RUN apt-get update && apt-get install -y --no-install-recommends \
       pandoc \
       libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev \
       libcairo2 fonts-dejavu fonts-liberation \
-      calibre \
+    && if [ "$INSTALL_CALIBRE" = "true" ]; then \
+         apt-get install -y --no-install-recommends calibre; \
+       fi \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /srv

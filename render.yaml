@@ -1,0 +1,21 @@
+# Render Blueprint — deploy TalkToBook from GitHub, no CLI needed.
+# In Render: New → Blueprint → pick this repo. It reads this file.
+# After the first deploy, set PUBLIC_URL to the assigned URL and redeploy.
+services:
+  - type: web
+    name: talktobook
+    runtime: docker
+    plan: starter            # free has no Docker; starter is the smallest paid tier
+    dockerfilePath: ./webapp/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PUBLIC_URL
+        sync: false          # set to https://<service>.onrender.com after first deploy
+      - key: MAX_TRANSCRIPT_CHARS
+        value: "800000"
+      # Stripe vars intentionally unset -> intent-capture (validation) mode.
+      # To go live with payments, add and set PUBLIC_URL:
+      #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
+      # To enable Kindle (AZW3) output, set the Docker build arg INSTALL_CALIBRE=true.

@@ -141,6 +141,12 @@ async def terms():
     return FileResponse(STATIC_DIR / "terms.html")
 
 
+@app.get("/healthz")
+async def healthz():
+    """Liveness/readiness probe for the host platform."""
+    return {"status": "ok", "capabilities": engine.capabilities()}
+
+
 @app.get("/api/config")
 async def public_config():
     return {
