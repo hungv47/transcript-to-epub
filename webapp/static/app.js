@@ -122,7 +122,7 @@ $("#preview-form").addEventListener("submit", async (e) => {
     CURRENT_JOB = data;
     renderResult(data);
   } catch (ex) {
-    err.textContent = ex.message;
+    err.textContent = ex.message || "Something went wrong. Try again, or email hello@talktobook.example if it keeps happening.";
     err.hidden = false;
   } finally {
     btn.disabled = false;
@@ -172,7 +172,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
     msg.textContent = data.message || "Thanks — we saved your interest.";
     msg.hidden = false;
   } catch (ex) {
-    msg.textContent = ex.message;
+    msg.textContent = ex.message || "Couldn't unlock. Try again, or email hello@talktobook.example.";
     msg.classList.add("err");
     msg.hidden = false;
   } finally {

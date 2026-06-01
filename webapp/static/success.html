@@ -3,31 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0C1211" />
+  <meta name="robots" content="noindex" />
   <title>Your book is ready — TalkToBook</title>
+  <meta name="description" content="Your TalkToBook download is being prepared. EPUB, PDF, and Kindle formats." />
+  <link rel="canonical" href="https://talktobook.com/success" />
+
+  <meta property="og:title" content="Your book is ready — TalkToBook" />
+  <meta property="og:description" content="Your TalkToBook download is being prepared." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://talktobook.com/success" />
+  <meta name="twitter:card" content="summary_large_image" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;1,7..72,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body>
+  <a class="skip" href="#main">Skip to downloads</a>
+
   <header class="site-header">
     <a class="wordmark" href="/">Talk<span>To</span>Book</a>
-    <nav><a class="btn btn-ghost" href="/">Make another</a></nav>
+    <nav aria-label="Primary"><a class="btn btn-ghost btn-sm" href="/">Make another</a></nav>
   </header>
 
-  <section class="section" style="max-width:680px;">
-    <div class="card result">
-      <span class="result-tag">Payment received</span>
-      <h1 id="title" style="font-size:1.8rem;margin:.3em 0 .2em;">Building your edition…</h1>
-      <p id="status" class="result-meta">Removing the watermark and rendering EPUB, PDF, and Kindle. This takes a few seconds.</p>
-      <div id="downloads" class="upsell" hidden>
-        <h4>Your downloads</h4>
-        <p id="download-links" style="font-size:1.05rem;line-height:2.2;"></p>
-        <p class="watermark-note">Bookmark this page — your link works for this book.</p>
-      </div>
-      <p id="error" class="form-error" hidden></p>
+  <main id="main" class="section section--app">
+    <div class="app">
+      <article class="card result" aria-live="polite">
+        <span class="result-tag">Payment received</span>
+        <h1 id="title" class="section-title" style="font-size:clamp(1.7rem,1.2rem+2vw,2.4rem);margin:.4em 0 .2em;">Building your edition…</h1>
+        <p id="status" class="result-meta">Dropping the watermark and rendering EPUB, PDF, and Kindle. A few seconds.</p>
+        <div id="downloads" class="upsell" hidden>
+          <h4>Your downloads</h4>
+          <p id="download-links" style="font-size:1.05rem;line-height:2.2;"></p>
+          <p class="watermark-note">Bookmark this page — your link works for this book.</p>
+        </div>
+        <p id="error" class="form-error" role="alert" hidden></p>
+      </article>
     </div>
-  </section>
+  </main>
 
   <script>
     const params = new URLSearchParams(location.search);

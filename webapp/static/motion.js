@@ -32,11 +32,13 @@
       show(el);
       io.unobserve(el);
     });
-  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
+  }, { rootMargin: "0px 0px 0px 0px", threshold: 0 });
 
   items.forEach(function (el) { if (!el.classList.contains("in")) io.observe(el); });
 
   // Failsafes: never leave content hidden if scroll never happens or IO stalls.
+  // First scroll = reveal everything below the fold immediately, so a fast
+  // scroller (or a snapshot/full-page capture) never catches a blank band.
   window.addEventListener("scroll", showAll, { once: true, passive: true });
   setTimeout(showAll, 1500);
 
