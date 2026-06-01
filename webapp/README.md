@@ -1,7 +1,7 @@
 # TalkToBook — web MVP
 
 Thin web wrapper around the `scripts/build.py` transcript→EPUB engine. Paste a
-YouTube URL, or upload a transcript/caption file → free preview EPUB → `$9`
+YouTube URL, or upload a transcript/caption file → free preview EPUB → `$7`
 unlock → clean, branded **EPUB + PDF + Kindle**. No accounts; jobs live on disk,
 paid files gated behind a separate download token.
 

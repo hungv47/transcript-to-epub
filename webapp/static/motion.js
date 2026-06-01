@@ -41,17 +41,4 @@
   // scroller (or a snapshot/full-page capture) never catches a blank band.
   window.addEventListener("scroll", showAll, { once: true, passive: true });
   setTimeout(showAll, 1500);
-
-  // Subtle pointer tilt on the hero book (fine pointers only).
-  var stage = document.querySelector(".book-stage");
-  var spread = document.getElementById("book-spread");
-  if (stage && spread && matchMedia("(hover: hover) and (pointer: fine)").matches) {
-    stage.addEventListener("pointermove", function (e) {
-      var r = stage.getBoundingClientRect();
-      var px = (e.clientX - r.left) / r.width - 0.5;
-      var py = (e.clientY - r.top) / r.height - 0.5;
-      spread.style.transform = "rotateY(" + (px * 7).toFixed(2) + "deg) rotateX(" + (-py * 7).toFixed(2) + "deg)";
-    });
-    stage.addEventListener("pointerleave", function () { spread.style.transform = ""; });
-  }
 })();

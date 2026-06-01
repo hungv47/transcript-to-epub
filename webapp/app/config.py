@@ -23,7 +23,7 @@ def _default_public_url() -> str:
 PUBLIC_URL = _default_public_url().rstrip("/")
 
 # Pricing (cents). Validate at the low anchor per the PRD.
-UNLOCK_PRICE_CENTS = int(os.environ.get("UNLOCK_PRICE_CENTS", "900"))
+UNLOCK_PRICE_CENTS = int(os.environ.get("UNLOCK_PRICE_CENTS", "700"))
 CURRENCY = os.environ.get("CURRENCY", "usd")
 
 # Stripe — when unset, the app runs in "intent capture" mode (no live payments),

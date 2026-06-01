@@ -1,7 +1,7 @@
 // TalkToBook front-end. Plain JS — no build step.
 const $ = (sel, root = document) => root.querySelector(sel);
 
-let CONFIG = { price_cents: 900, currency: "usd", stripe_enabled: false };
+let CONFIG = { price_cents: 700, currency: "usd", stripe_enabled: false };
 let CURRENT_JOB = null;
 
 function money(cents, currency) {
@@ -31,36 +31,6 @@ async function loadConfig() {
   } catch (_) { /* defaults are fine */ }
 }
 
-// ---- Sample library ----
-async function loadSamples() {
-  const grid = document.getElementById("sample-grid");
-  if (!grid) return;
-  try {
-    const { samples } = await (await fetch("/api/samples")).json();
-    if (!samples || !samples.length) { grid.closest("section").style.display = "none"; return; }
-    grid.innerHTML = samples.map(function (s) {
-      const cover = s.cover
-        ? `<img class="sample-cover" src="${s.cover}" alt="Cover of ${esc(s.title)}" loading="lazy" />`
-        : `<div class="sample-cover sample-cover--blank"></div>`;
-      const pdf = s.pdf ? ` · <a href="${s.pdf}" download>PDF</a>` : "";
-      return `<article class="sample-card">
-        <div class="sample-coverframe">${cover}</div>
-        <div class="sample-body">
-          <span class="sample-kind">${esc(s.kind || "Sample")}</span>
-          <h3>${esc(s.title)}</h3>
-          <p class="sample-author">by ${esc(s.author)}</p>
-          <p class="sample-blurb">${esc(s.blurb)}</p>
-          <div class="sample-actions">
-            <a class="btn btn-primary btn-sm" href="${s.epub}" download>Download EPUB</a>
-            <span class="sample-alt">${pdf}</span>
-          </div>
-        </div>
-      </article>`;
-    }).join("");
-  } catch (_) {
-    grid.closest("section").style.display = "none";
-  }
-}
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
@@ -166,4 +136,3 @@ function renderDownloads(downloads) {
 }
 
 loadConfig();
-loadSamples();

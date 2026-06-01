@@ -27,7 +27,7 @@ class Job:
     raw_text: str
     paid: bool = False
     email: str | None = None
-    accent: str = "#B7FF6E"
+    accent: str = "#7F1D1D"
     download_token: str | None = None
     stripe_session_id: str | None = None
     # Outputs as {kind: filename}, e.g. {"epub": "book.epub"}.

@@ -34,7 +34,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 import build as t2e  # noqa: E402  (clean_transcript, detect_speakers, etc.)
 
-BRAND_ACCENT = "#B7FF6E"
+BRAND_ACCENT = "#7F1D1D"
 BRAND_INK = "#0C1211"
 # Credit is never silently dropped: when no creator can be detected, the byline
 # degrades to this rather than vanishing. The author is never user-editable —

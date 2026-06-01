@@ -1,7 +1,7 @@
 """TalkToBook — FastAPI service wrapping the transcript-to-epub engine.
 
 Flow: YouTube URL or transcript upload → free EPUB preview (watermarked, plain
-cover) → $9 unlock → clean, branded EPUB + PDF + Kindle. No accounts; jobs live
+cover) → $7 unlock → clean, branded EPUB + PDF + Kindle. No accounts; jobs live
 on disk keyed by an unguessable id, paid files gated behind a separate download
 token.
 """
@@ -20,7 +20,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, engine, payments, samples, storage
+from . import config, engine, payments, storage
 
 app = FastAPI(title=f"{config.APP_NAME} API")
 
@@ -228,32 +228,6 @@ async def public_config():
         "contact_email": config.CONTACT_EMAIL,
         "dmca_email": config.DMCA_EMAIL,
     }
-
-
-# ---------------------------------------------------------------------------
-# Sample library (original, zero-IP-risk demo books)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/samples")
-async def list_samples():
-    return {"samples": samples.get_manifest()}
-
-
-@app.get("/api/sample/{slug}/{name}")
-async def sample_file(slug: str, name: str):
-    path = samples.file_for(slug, name)
-    if not path:
-        raise HTTPException(404, "Not found.")
-    media = {
-        "book.epub": "application/epub+zip",
-        "book.pdf": "application/pdf",
-        "cover.png": "image/png",
-    }.get(name, "application/octet-stream")
-    # Inline for cover thumbnails; download for the book files.
-    if name == "cover.png":
-        return FileResponse(path, media_type=media)
-    safe = re.sub(r"[^\w\- ]", "", slug)[:60] or "sample"
-    return FileResponse(path, media_type=media, filename=f"{safe}{Path(name).suffix}")
 
 
 # ---------------------------------------------------------------------------
