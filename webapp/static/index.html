@@ -6,7 +6,16 @@
   <title>TalkToBook — Turn your podcast, talk, or interview into a Kindle-ready book</title>
   <meta name="description" content="Paste a transcript, get a designed, Kindle-ready ebook. Free preview, $9 to unlock the clean, branded edition with EPUB, PDF, and Kindle formats." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/style.css" />
+  <script>
+    // Opt into motion before first paint so reveals never flash. No-op under
+    // reduced-motion (content stays visible by default).
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.documentElement.classList.add("motion");
+    }
+  </script>
 </head>
 <body>
   <header class="site-header">
@@ -15,56 +24,84 @@
       <a href="#how">How it works</a>
       <a href="#examples">Examples</a>
       <a href="#pricing">Pricing</a>
-      <a class="btn btn-ghost" href="#start">Start free</a>
+      <a class="btn btn-ghost btn-sm" href="#start">Start free</a>
     </nav>
   </header>
 
   <!-- Hero -->
   <section class="hero">
     <div class="hero-inner">
-      <p class="kicker">For podcasters, speakers &amp; creators</p>
-      <h1>Turn your podcast, talk, or interview into a <span class="accent">Kindle-ready book</span>.</h1>
-      <p class="lede">
-        Paste a transcript of <em>your own</em> spoken content and get a calm, designed ebook —
-        cleaned, laid out, and ready to read. Preview it free. Pay once to unlock the
-        clean, branded, Kindle-ready edition.
-      </p>
-      <div class="hero-cta">
-        <a class="btn btn-primary" href="#start">Make my book — free preview</a>
-        <span class="cta-note">No account. No card to preview.</span>
+      <div class="hero-copy">
+        <p class="kicker" data-reveal><span class="dot"></span>For podcasters, speakers &amp; creators</p>
+        <h1 data-reveal>Turn your podcast, talk, or interview into a <span class="accent">Kindle-ready book</span>.</h1>
+        <p class="lede" data-reveal>
+          Paste a transcript of <em>your own</em> spoken content and get a calm, designed
+          ebook — cleaned, laid out, ready to read. Preview it free; pay once to unlock the
+          clean, branded edition.
+        </p>
+        <div class="hero-cta" data-reveal>
+          <a class="btn btn-primary" href="#start">Make my book — free preview</a>
+          <span class="cta-note">No account. No card to preview.</span>
+        </div>
+      </div>
+
+      <!-- Built mockup of the actual output: cover + open reading page -->
+      <div class="book-stage" data-reveal aria-hidden="true">
+        <div class="book-spread" id="book-spread">
+          <div class="book book-cover">
+            <div class="bc">
+              <p class="bc-eyebrow">A reading edition</p>
+              <h3 class="bc-title">A Short Conversation on Craft</h3>
+              <span class="bc-rule"></span>
+              <p class="bc-by">Ada &amp; Grace</p>
+            </div>
+          </div>
+          <div class="book book-page">
+            <div class="bp">
+              <p class="bp-ch">Chapter one</p>
+              <p>Welcome back. Today we're talking about how good tools quietly disappear into the work. The best ones never ask for attention.</p>
+              <blockquote>A tool earns trust by being boring in the best way.</blockquote>
+              <p>Predictability first. Then, once you trust it, you can build cleverness on top.</p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- How it works -->
   <section id="how" class="section">
-    <h2 class="section-title">Three steps, about a minute</h2>
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>Three steps, about a minute</h2>
+    </header>
     <ol class="steps">
-      <li>
+      <li data-reveal>
         <span class="step-num">1</span>
         <h3>Paste or upload</h3>
         <p>Drop in a transcript — <code>.txt</code>, <code>.md</code>, <code>.srt</code>, or <code>.vtt</code>. Timestamps and filler get cleaned automatically.</p>
       </li>
-      <li>
+      <li data-reveal>
         <span class="step-num">2</span>
         <h3>Preview free</h3>
         <p>We build a real EPUB you can open and read — designed pages, a cover, the works. No card required.</p>
       </li>
-      <li>
+      <li data-reveal>
         <span class="step-num">3</span>
         <h3>Unlock &amp; publish</h3>
-        <p>Pay once to remove branding, set your cover &amp; accent, and download EPUB + PDF + Kindle.</p>
+        <p>Pay once to remove branding, set your cover &amp; accent, and download EPUB, PDF, and Kindle.</p>
       </li>
     </ol>
   </section>
 
   <!-- Examples -->
   <section id="examples" class="section section-muted">
-    <h2 class="section-title">From rambling transcript to clean page</h2>
-    <p class="section-sub">Honest before/after — the engine cleans timestamps, merges fragments into paragraphs, and sets interviewer turns apart. It won't rewrite your ideas.</p>
-    <div class="ba">
-      <div class="ba-card">
-        <span class="ba-tag">Before — raw transcript</span>
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>From rambling transcript to clean page</h2>
+      <p class="section-sub" data-reveal>Honest before and after. The engine cleans timestamps, merges fragments into paragraphs, and sets interviewer turns apart. It won't rewrite your ideas.</p>
+    </header>
+    <div class="ba" data-reveal>
+      <figure class="ba-card ba-before">
+        <figcaption>Before — raw transcript</figcaption>
         <pre class="ba-raw">**00:00:00**: &gt;&gt; Ada: Welcome back. Today we're
 talking about how good tools quietly
 disappear into the work.
@@ -72,24 +109,28 @@ disappear into the work.
 for attention. You just reach for them.
 **00:00:15**: &gt;&gt; Grace: Right. A tool earns trust
 by being boring in the best way.</pre>
-      </div>
-      <div class="ba-card">
-        <span class="ba-tag ba-tag-after">After — designed page</span>
+      </figure>
+      <div class="ba-arrow" aria-hidden="true">→</div>
+      <figure class="ba-card ba-after">
+        <figcaption>After — designed page</figcaption>
         <div class="ba-page">
           <h4>A Short Conversation on Craft</h4>
-          <p class="byline">by Ada &amp; Grace</p>
+          <p class="byline">Ada &amp; Grace</p>
           <p>Welcome back. Today we're talking about how good tools quietly disappear into the work. The best ones never ask for attention. You just reach for them.</p>
           <blockquote>Right. A tool earns trust by being boring in the best way.</blockquote>
         </div>
-      </div>
+      </figure>
     </div>
   </section>
 
   <!-- The app -->
   <section id="start" class="section">
-    <h2 class="section-title">Make your book</h2>
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>Make your book</h2>
+      <p class="section-sub" data-reveal>Paste a transcript or drop a file. You'll get a real EPUB to read in seconds.</p>
+    </header>
     <div class="app">
-      <form id="preview-form" class="card form">
+      <form id="preview-form" class="card form" data-reveal>
         <label class="field">
           <span>Book title</span>
           <input type="text" name="title" placeholder="e.g. A Short Conversation on Craft" />
@@ -100,9 +141,9 @@ by being boring in the best way.</pre>
         </label>
         <p class="byline-note">The byline is read from the transcript and always credits the original creators.</p>
 
-        <div class="tabs" role="tablist">
-          <button type="button" class="tab active" data-tab="paste" role="tab">Paste transcript</button>
-          <button type="button" class="tab" data-tab="upload" role="tab">Upload a file</button>
+        <div class="tabs" role="tablist" aria-label="Transcript input method">
+          <button type="button" class="tab active" data-tab="paste" role="tab" aria-selected="true">Paste transcript</button>
+          <button type="button" class="tab" data-tab="upload" role="tab" aria-selected="false">Upload a file</button>
         </div>
 
         <div class="tab-panel" data-panel="paste">
@@ -137,7 +178,7 @@ by being boring in the best way.</pre>
           </div>
           <a id="download-preview" class="btn btn-ghost" download>Download preview EPUB</a>
         </div>
-        <p class="watermark-note">Your preview carries a small “Made with TalkToBook” colophon and a plain cover. Unlock below to remove it.</p>
+        <p class="watermark-note">Your preview carries a small “Made with TalkToBook” colophon and a plain cover. Unlock below to remove them.</p>
 
         <!-- Upsell -->
         <div class="upsell">
@@ -180,9 +221,12 @@ by being boring in the best way.</pre>
 
   <!-- Pricing -->
   <section id="pricing" class="section section-muted">
-    <h2 class="section-title">Simple pricing</h2>
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>Simple pricing</h2>
+      <p class="section-sub" data-reveal>Preview every book for free. Pay only when you're ready to publish one.</p>
+    </header>
     <div class="pricing">
-      <div class="plan">
+      <div class="plan" data-reveal>
         <h3>Free preview</h3>
         <p class="plan-price">$0</p>
         <ul>
@@ -192,7 +236,7 @@ by being boring in the best way.</pre>
           <li class="muted">“Made with TalkToBook” colophon</li>
         </ul>
       </div>
-      <div class="plan plan-feature">
+      <div class="plan plan-feature" data-reveal>
         <span class="plan-badge">Most popular</span>
         <h3>Single unlock</h3>
         <p class="plan-price"><span id="plan-price">$9</span> <small>one-time</small></p>
@@ -202,18 +246,22 @@ by being boring in the best way.</pre>
           <li>Your cover &amp; accent</li>
           <li><strong>EPUB + PDF + Kindle</strong></li>
         </ul>
-        <a class="btn btn-primary" href="#start">Start free, unlock when ready</a>
+        <a class="btn btn-primary btn-block" href="#start">Start free, unlock when ready</a>
       </div>
     </div>
   </section>
 
   <!-- FAQ -->
   <section class="section faq">
-    <h2 class="section-title">Questions</h2>
-    <details><summary>Does it read like a real book?</summary><p>The engine strips timestamps and filler and merges spoken fragments into paragraphs with proper typography. Spoken content is still spoken content — it won't invent structure your talk didn't have. Light AI restructuring is on the roadmap.</p></details>
-    <details><summary>Can I use any YouTube video?</summary><p>This is for content you own or have the rights to — you confirm that before generating. It's a tool for creators repurposing their own work, not for ripping other people's videos.</p></details>
-    <details><summary>I only have audio, not a transcript.</summary><p>Transcribe it first (most podcast hosts and tools export one), then paste it here. Built-in transcription is the next thing on our list.</p></details>
-    <details><summary>What formats do I get?</summary><p>The free preview is EPUB. Unlocking adds PDF and Kindle (AZW3) alongside a clean, branded EPUB.</p></details>
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>Questions</h2>
+    </header>
+    <div class="faq-list" data-reveal>
+      <details><summary>Does it read like a real book?</summary><p>The engine strips timestamps and filler and merges spoken fragments into paragraphs with proper typography. Spoken content is still spoken content — it won't invent structure your talk didn't have. Light AI restructuring is on the roadmap.</p></details>
+      <details><summary>Can I use any YouTube video?</summary><p>This is for content you own or have the rights to — you confirm that before generating. It's a tool for creators repurposing their own work, not for ripping other people's videos.</p></details>
+      <details><summary>I only have audio, not a transcript.</summary><p>Transcribe it first (most podcast hosts and tools export one), then paste it here. Built-in transcription is the next thing on our list.</p></details>
+      <details><summary>What formats do I get?</summary><p>The free preview is EPUB. Unlocking adds PDF and Kindle (AZW3) alongside a clean, branded EPUB.</p></details>
+    </div>
   </section>
 
   <footer class="site-footer">
@@ -222,5 +270,6 @@ by being boring in the best way.</pre>
   </footer>
 
   <script src="/static/app.js"></script>
+  <script src="/static/motion.js"></script>
 </body>
 </html>
