@@ -63,6 +63,10 @@ def new_job(*, title: str, author: str | None, source_url: str | None,
         source_url=source_url,
         fmt=fmt,
         raw_text=raw_text,
+        # Mint the paid-download token up front so concurrent fulfillments
+        # (webhook + success-page poll) can't mint two and invalidate each
+        # other. The token gates nothing until job.paid flips true.
+        download_token=secrets.token_urlsafe(16),
     )
     job.dir.mkdir(parents=True, exist_ok=True)
     save(job)
@@ -83,16 +87,3 @@ def load(job_id: str) -> Job | None:
         return None
     data = json.loads(p.read_text(encoding="utf-8"))
     return Job(**data)
-
-
-def find_by_session(session_id: str) -> Job | None:
-    if not config.JOBS_DIR.exists():
-        return None
-    for meta in config.JOBS_DIR.glob("*/meta.json"):
-        try:
-            data = json.loads(meta.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        if data.get("stripe_session_id") == session_id:
-            return Job(**data)
-    return None

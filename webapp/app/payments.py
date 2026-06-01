@@ -59,13 +59,35 @@ def verify_webhook(payload: bytes, sig_header: str):
         return None
 
 
-def session_is_paid(session_id: str) -> bool:
-    """Confirm a Checkout Session is paid (used by the success page poll)."""
+def _session_amount_ok(s) -> bool:
+    """A session is acceptable only if it is paid AND for the exact product
+    price/currency — so a cheaper or different-currency session can't fulfill."""
+    return (
+        s.get("payment_status") == "paid"
+        and s.get("amount_total") == config.UNLOCK_PRICE_CENTS
+        and (s.get("currency") or "").lower() == config.CURRENCY.lower()
+    )
+
+
+def webhook_session_ok(session) -> bool:
+    """Validate a webhook checkout.session object before fulfillment."""
+    return _session_amount_ok(session)
+
+
+def session_job_id(session_id: str) -> str | None:
+    """Return the job_id a *paid, correctly-priced* session belongs to, else None.
+
+    Binds the payment to its own job (via Checkout metadata) so a single paid
+    session can't be replayed against a different job to unlock it for free.
+    Used by the success-page poll as a webhook fallback.
+    """
     if not config.stripe_enabled() or stripe is None:
-        return False
+        return None
     stripe.api_key = config.STRIPE_SECRET_KEY
     try:
         s = stripe.checkout.Session.retrieve(session_id)
     except Exception:
-        return False
-    return s.get("payment_status") == "paid"
+        return None
+    if not _session_amount_ok(s):
+        return None
+    return (s.get("metadata") or {}).get("job_id")

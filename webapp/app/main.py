@@ -7,8 +7,10 @@ keyed by an unguessable id, paid files gated behind a separate download token.
 
 from __future__ import annotations
 
+import io
 import json
 import re
+import secrets
 import time
 from pathlib import Path
 
@@ -37,6 +39,19 @@ DOWNLOAD_NAMES = {
 
 def _bool(v: str | None) -> bool:
     return (v or "").strip().lower() in ("1", "true", "on", "yes")
+
+
+def _valid_image(data: bytes) -> bool:
+    """True if bytes decode as an image — so a bad upload can't fail the paid
+    build later. If Pillow is unavailable, don't block (engine retries coverless)."""
+    try:
+        from PIL import Image
+        Image.open(io.BytesIO(data)).verify()
+        return True
+    except ImportError:
+        return True
+    except Exception:
+        return False
 
 
 def _event(kind: str, **fields) -> None:
@@ -253,10 +268,13 @@ async def unlock(
         ext = cover.filename.rsplit(".", 1)[-1].lower() if "." in cover.filename else "png"
         if ext in ("png", "jpg", "jpeg"):
             data = await cover.read()
-            if len(data) <= config.MAX_UPLOAD_BYTES:
-                for old in job.dir.glob("uploaded_cover.*"):
-                    old.unlink()
-                (job.dir / f"uploaded_cover.{ext}").write_bytes(data)
+            if len(data) > config.MAX_UPLOAD_BYTES:
+                raise HTTPException(400, "Cover image is too large.")
+            if not _valid_image(data):
+                raise HTTPException(400, "That cover image couldn't be read. Use a valid PNG or JPG.")
+            for old in job.dir.glob("uploaded_cover.*"):
+                old.unlink()
+            (job.dir / f"uploaded_cover.{ext}").write_bytes(data)
     storage.save(job)
     _event("unlock_click", job_id=job.id, email=bool(job.email), stripe=config.stripe_enabled())
 
@@ -275,8 +293,9 @@ async def unlock(
         storage.save(job)
         return {"checkout_url": result["url"]}
 
-    # Intent-capture mode: no live payments yet. Record the demand signal.
-    _event("unlock_intent", job_id=job.id, email=job.email or "", title=job.title)
+    # Intent-capture mode: no live payments yet. Record the demand signal —
+    # the lead email is persisted on the job record, not in the funnel log.
+    _event("unlock_intent", job_id=job.id, email=bool(job.email))
     return {
         "intent": True,
         "message": "Payments are launching shortly — we saved your email and will send your unlock link the moment they go live.",
@@ -294,9 +313,10 @@ async def stripe_webhook(request: Request):
         session = event["data"]["object"]
         job_id = (session.get("metadata") or {}).get("job_id")
         job = storage.load(job_id) if job_id else None
-        if job:
+        # Only fulfill when the session is genuinely paid for the right amount.
+        if job and payments.webhook_session_ok(session):
             job.stripe_session_id = session.get("id")
-            job.email = job.email or session.get("customer_details", {}).get("email")
+            job.email = job.email or (session.get("customer_details") or {}).get("email")
             fulfill(job)
     return JSONResponse({"received": True})
 
@@ -307,7 +327,9 @@ async def job_status(job_id: str, session_id: str | None = None):
     if not job:
         raise HTTPException(404, "Unknown job.")
     # Reconcile a returning Checkout customer if the webhook hasn't landed yet.
-    if not job.paid and session_id and payments.session_is_paid(session_id):
+    # The session must belong to THIS job (metadata binding), so a paid session
+    # for one job can't be replayed to unlock another.
+    if not job.paid and session_id and payments.session_job_id(session_id) == job.id:
         fulfill(job)
     return _job_public(job)
 
@@ -327,7 +349,8 @@ async def download(job_id: str, token: str, name: str):
     if token == "preview":
         path = job.preview_dir / name
     else:
-        if not (job.paid and job.download_token and token == job.download_token):
+        if not (job.paid and job.download_token
+                and secrets.compare_digest(token, job.download_token)):
             raise HTTPException(403, "This download is locked. Complete checkout to unlock.")
         path = job.paid_dir / name
 

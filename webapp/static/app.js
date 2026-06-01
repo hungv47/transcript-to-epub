@@ -84,8 +84,11 @@ if (demoBtn) {
 // ---- Tabs ----
 document.querySelectorAll(".tab").forEach((tab) => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-    tab.classList.add("active");
+    document.querySelectorAll(".tab").forEach((t) => {
+      const on = t === tab;
+      t.classList.toggle("active", on);
+      t.setAttribute("aria-selected", String(on)); // keep SR state in sync
+    });
     const which = tab.dataset.tab;
     document.querySelectorAll(".tab-panel").forEach((p) =>
       p.classList.toggle("hidden", p.dataset.panel !== which)
@@ -181,7 +184,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
 function renderDownloads(downloads) {
   const msg = $("#unlock-msg");
   const links = Object.entries(downloads)
-    .map(([k, url]) => `<a href="${url}" download>${k.toUpperCase()}</a>`)
+    .map(([k, url]) => `<a href="${esc(url)}" download>${esc(k.toUpperCase())}</a>`)
     .join(" · ");
   msg.innerHTML = `Unlocked! Download: ${links}`;
   msg.hidden = false;

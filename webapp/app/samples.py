@@ -55,7 +55,9 @@ def _build_one(s: dict, dest_root: Path) -> dict:
     # otherwise the engine falls back to its plain rendered cover.
     art_cover = SRC_DIR / "covers" / f"{s['slug']}.png"
     use_cover = art_cover if art_cover.exists() else None
-    if not epub.exists():
+    # Rebuild if missing, or if newer cover art has been dropped in since.
+    stale = use_cover and epub.exists() and use_cover.stat().st_mtime > epub.stat().st_mtime
+    if not epub.exists() or stale:
         raw = (SRC_DIR / s["src"]).read_text(encoding="utf-8")
         engine.generate(
             d, raw_text=raw, fmt="md",
@@ -63,9 +65,9 @@ def _build_one(s: dict, dest_root: Path) -> dict:
             cover_image=use_cover,
         )
     # The engine embeds a supplied cover but doesn't write cover.png; copy it in
-    # so the thumbnail route has something to serve.
+    # (or refresh it) so the thumbnail route serves the current art.
     cov = d / "cover.png"
-    if use_cover and not cov.exists():
+    if use_cover and (not cov.exists() or use_cover.stat().st_mtime > cov.stat().st_mtime):
         shutil.copyfile(use_cover, cov)
     item = {k: s[k] for k in ("slug", "title", "author", "kind", "blurb")}
     item["epub"] = f"/api/sample/{s['slug']}/book.epub"

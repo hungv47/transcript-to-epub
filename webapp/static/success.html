@@ -46,10 +46,13 @@
       if (tries > 30) { fail("Still processing — refresh in a moment, or check the email we sent."); return; }
       setTimeout(() => poll(tries + 1), 2000);
     }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
     function show(job) {
       document.getElementById("status").textContent = "Done. Your clean, branded edition is ready.";
       const links = Object.entries(job.downloads)
-        .map(([k, u]) => `<a class="btn btn-primary" style="margin:4px" href="${u}" download>${KINDS[k] || k}</a>`)
+        .map(([k, u]) => `<a class="btn btn-primary" style="margin:4px" href="${esc(u)}" download>${esc(KINDS[k] || k)}</a>`)
         .join(" ");
       document.getElementById("download-links").innerHTML = links;
       document.getElementById("downloads").hidden = false;

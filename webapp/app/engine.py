@@ -321,7 +321,16 @@ def generate(
 
     outputs: dict[str, str] = {}
     epub_path = job_dir / "book.epub"
-    build_epub(md_path, epub_path, css_path, title, author, cover_path)
+    try:
+        build_epub(md_path, epub_path, css_path, title, author, cover_path)
+    except EngineError:
+        # A bad/unreadable custom cover shouldn't fail the whole build — retry
+        # without it rather than 500 a paying customer. Re-raise if it wasn't
+        # the cover (no cover supplied).
+        if cover_path is not None:
+            build_epub(md_path, epub_path, css_path, title, author, None)
+        else:
+            raise
     outputs["epub"] = epub_path.name
 
     if paid:
