@@ -10,6 +10,7 @@ publisher of others' IP rather than a tool. See terms.html.
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from . import config, engine
@@ -50,12 +51,22 @@ _manifest: list[dict] | None = None
 def _build_one(s: dict, dest_root: Path) -> dict:
     d = dest_root / s["slug"]
     epub = d / "book.epub"
+    # Use AI-generated cover art (samples/covers/<slug>.png) when committed;
+    # otherwise the engine falls back to its plain rendered cover.
+    art_cover = SRC_DIR / "covers" / f"{s['slug']}.png"
+    use_cover = art_cover if art_cover.exists() else None
     if not epub.exists():
         raw = (SRC_DIR / s["src"]).read_text(encoding="utf-8")
         engine.generate(
             d, raw_text=raw, fmt="md",
             title=s["title"], author=s["author"], source_url=None, paid=True,
+            cover_image=use_cover,
         )
+    # The engine embeds a supplied cover but doesn't write cover.png; copy it in
+    # so the thumbnail route has something to serve.
+    cov = d / "cover.png"
+    if use_cover and not cov.exists():
+        shutil.copyfile(use_cover, cov)
     item = {k: s[k] for k in ("slug", "title", "author", "kind", "blurb")}
     item["epub"] = f"/api/sample/{s['slug']}/book.epub"
     item["cover"] = f"/api/sample/{s['slug']}/cover.png" if (d / "cover.png").exists() else None

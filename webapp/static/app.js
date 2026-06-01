@@ -34,7 +34,7 @@ async function loadSamples() {
         : `<div class="sample-cover sample-cover--blank"></div>`;
       const pdf = s.pdf ? ` · <a href="${s.pdf}" download>PDF</a>` : "";
       return `<article class="sample-card">
-        ${cover}
+        <div class="sample-coverframe">${cover}</div>
         <div class="sample-body">
           <span class="sample-kind">${esc(s.kind || "Sample")}</span>
           <h3>${esc(s.title)}</h3>

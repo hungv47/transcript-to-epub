@@ -94,7 +94,7 @@ code { font-family: var(--mono); font-size: 0.85em; background: rgba(12,18,17,.0
 .hero { background: var(--ink); color: #fff; overflow: hidden; }
 .hero-inner {
   max-width: var(--wide); margin: 0 auto;
-  padding: clamp(56px, 9vw, 116px) clamp(20px, 5vw, 56px);
+  padding: clamp(48px, 7vw, 92px) clamp(20px, 5vw, 56px);
   display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(0, 0.96fr);
   gap: clamp(36px, 6vw, 80px); align-items: center;
 }
@@ -155,10 +155,10 @@ code { font-family: var(--mono); font-size: 0.85em; background: rgba(12,18,17,.0
 .bp blockquote { margin: 10px 0; padding-left: 10px; border-left: 2.5px solid var(--lime); font-style: italic; font-size: clamp(0.6rem, 0.92vw, 0.74rem); color: #444; }
 
 /* ---------- Sections ---------- */
-.section { max-width: var(--wide); margin: 0 auto; padding: clamp(60px, 9vw, 120px) clamp(20px, 5vw, 56px); }
+.section { max-width: var(--wide); margin: 0 auto; padding: clamp(44px, 6vw, 84px) clamp(20px, 5vw, 56px); }
 .section-muted { max-width: none; background: var(--paper-2); border-block: 1px solid var(--line); }
 .section-muted > * { max-width: var(--wide); margin-inline: auto; }
-.section-head { margin-bottom: clamp(32px, 5vw, 52px); }
+.section-head { margin-bottom: clamp(22px, 3.5vw, 38px); }
 .section-title { font-size: clamp(1.7rem, 1.2rem + 2.4vw, 2.7rem); font-weight: 700; letter-spacing: -0.03em; }
 .section-sub { color: var(--muted); max-width: 58ch; margin: 14px 0 0; font-size: 1.1rem; font-family: var(--serif); line-height: 1.55; }
 
@@ -192,8 +192,9 @@ code { font-family: var(--mono); font-size: 0.85em; background: rgba(12,18,17,.0
   transition: transform .3s var(--ease), box-shadow .3s var(--ease);
 }
 .sample-card:hover { transform: translateY(-4px); box-shadow: 0 22px 46px -26px rgba(12,18,17,.45); }
-.sample-cover { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 22%; background: var(--ink); display: block; border-bottom: 1px solid var(--line); }
-.sample-cover--blank { background: var(--ink-soft); }
+.sample-coverframe { display: flex; justify-content: center; padding: 28px 0 26px; background: var(--paper-2); border-bottom: 1px solid var(--line); }
+.sample-cover { width: auto; height: 210px; aspect-ratio: 2 / 3; object-fit: cover; display: block; border-radius: 3px 5px 5px 3px; box-shadow: 0 16px 34px -14px rgba(12,18,17,.55), 0 4px 10px -6px rgba(12,18,17,.4); }
+.sample-cover--blank { width: 140px; background: var(--ink-soft); }
 .sample-body { padding: 20px 22px 24px; display: flex; flex-direction: column; flex: 1; }
 .sample-kind { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lime-deep); font-weight: 700; margin-bottom: 8px; }
 .sample-card h3 { font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 2px; }
