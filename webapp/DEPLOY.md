@@ -7,8 +7,8 @@ root** (the Dockerfile copies both `scripts/` and `webapp/`). Config lives in
 
 ## Ship posture (validation slice)
 
-First ship runs in **intent-capture mode**: free preview + sample downloads +
-"unlock" captures an email as a demand signal. **No Stripe keys needed.** Wire
+First ship can run in **intent-capture mode**: free preview + sample downloads +
+"unlock" captures an email as a demand signal. **No Polar keys needed.** Wire
 payments only after the unlock signal clears your kill threshold (see PRD).
 
 | Format | In the lean image |
@@ -49,19 +49,24 @@ railway domain              # generate a public URL
 |---|---|---|
 | `PUBLIC_URL` | optional on Railway | auto-derived from `RAILWAY_PUBLIC_DOMAIN`; set explicitly only for a custom domain |
 | `MAX_TRANSCRIPT_CHARS` | optional | default `800000` |
-| `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` / `STRIPE_WEBHOOK_SECRET` | to go live | unset → intent-capture mode |
+| `POLAR_ACCESS_TOKEN` / `POLAR_PRODUCT_ID` / `POLAR_WEBHOOK_SECRET` | to go live | unset → intent-capture mode |
+| `POLAR_SERVER` | testing | `sandbox` for sandbox tokens/products; default `production` |
+| `PLAN_PRICE_CENTS` | optional | UI display price; default `700` |
+| `FORCE_HTTPS` | production | defaults on when `PUBLIC_URL` starts with `https://`; fixes insecure download warnings |
 | `INSTALL_CALIBRE` (build arg) | for Kindle | set `true` in Railway **Build** settings to enable AZW3 |
 
 `PORT` is injected by Railway and honored by the Dockerfile CMD — don't set it.
 
-## Going live with payments (later)
+## Going live with payments
 
-1. Add the three `STRIPE_*` vars.
-2. Stripe → webhook → `https://<your-domain>/api/webhook`, event
-   `checkout.session.completed`.
-3. **Test mode first**: run one full Checkout round-trip (the fresh-eyes review
-   flagged the Stripe binding as unit-tested only).
-4. For Kindle output, set build arg `INSTALL_CALIBRE=true` and redeploy.
+1. Create a recurring `$7/month` Polar product and copy its Product ID.
+2. Add `POLAR_ACCESS_TOKEN`, `POLAR_PRODUCT_ID`, and `POLAR_WEBHOOK_SECRET`.
+3. Polar → webhook → `https://<your-domain>/api/webhook`, events `order.paid`,
+   `subscription.active`, `subscription.canceled`, `subscription.revoked`, and
+   `customer.state_changed`.
+4. **Sandbox first**: set `POLAR_SERVER=sandbox` and run one full Checkout
+   round-trip before switching to production keys.
+5. For Kindle output, set build arg `INSTALL_CALIBRE=true` and redeploy.
 
 ## Persistence note
 

@@ -1,7 +1,7 @@
 // TalkToBook front-end. Plain JS — no build step.
 const $ = (sel, root = document) => root.querySelector(sel);
 
-let CONFIG = { price_cents: 900, currency: "usd", stripe_enabled: false };
+let CONFIG = { price_cents: 700, currency: "usd", payments_enabled: false };
 let CURRENT_JOB = null;
 
 function money(cents, currency) {
@@ -13,88 +13,39 @@ function money(cents, currency) {
 async function loadConfig() {
   try {
     CONFIG = await (await fetch("/api/config")).json();
+    // Set the CTA mode first: in waitlist mode this replaces the whole button
+    // label (incl. the price span), so the price loop below cleanly skips the
+    // now-absent #unlock-price node instead of formatting then clobbering it.
+    applyPaymentMode();
     const p = money(CONFIG.price_cents, CONFIG.currency);
     ["price", "unlock-price", "plan-price"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = p;
     });
+    if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {
+      const form = document.getElementById("preview-form");
+      const err = document.getElementById("preview-error");
+      const btn = form?.querySelector("button[type=submit]");
+      if (btn) btn.disabled = true;
+      if (err) {
+        err.textContent = "EPUB generation is temporarily unavailable on this server.";
+        err.hidden = false;
+      }
+    }
   } catch (_) { /* defaults are fine */ }
 }
 
-// ---- Sample library ----
-async function loadSamples() {
-  const grid = document.getElementById("sample-grid");
-  if (!grid) return;
-  try {
-    const { samples } = await (await fetch("/api/samples")).json();
-    if (!samples || !samples.length) { grid.closest("section").style.display = "none"; return; }
-    grid.innerHTML = samples.map(function (s) {
-      const cover = s.cover
-        ? `<img class="sample-cover" src="${s.cover}" alt="Cover of ${esc(s.title)}" loading="lazy" />`
-        : `<div class="sample-cover sample-cover--blank"></div>`;
-      const pdf = s.pdf ? ` · <a href="${s.pdf}" download>PDF</a>` : "";
-      return `<article class="sample-card">
-        <div class="sample-coverframe">${cover}</div>
-        <div class="sample-body">
-          <span class="sample-kind">${esc(s.kind || "Sample")}</span>
-          <h3>${esc(s.title)}</h3>
-          <p class="sample-author">by ${esc(s.author)}</p>
-          <p class="sample-blurb">${esc(s.blurb)}</p>
-          <div class="sample-actions">
-            <a class="btn btn-primary btn-sm" href="${s.epub}" download>Download EPUB</a>
-            <span class="sample-alt">${pdf}</span>
-          </div>
-        </div>
-      </article>`;
-    }).join("");
-  } catch (_) {
-    grid.closest("section").style.display = "none";
-  }
+// Keep the unlock CTA honest: when Polar isn't wired yet, a click captures
+// interest rather than charging, so don't promise an instant subscription.
+function applyPaymentMode() {
+  if (CONFIG.payments_enabled) return;
+  const btn = document.getElementById("unlock-btn");
+  if (btn) btn.textContent = "Join the creator-plan waitlist";
 }
+
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
-
-// ---- Try a demo (original, zero-IP content) ----
-const DEMO = {
-  title: "A Short Conversation on Craft",
-  transcript: `**00:00:00**: >> Ada: Welcome back. Today we're talking about how good tools quietly disappear into the work.
-**00:00:08**: >> Ada: The best ones never ask for attention. You just reach for them.
-**00:00:15**: >> Grace: Right. A tool earns trust by being boring in the best way. It does the same thing every time.
-**00:00:24**: >> Grace: When it surprises you, that's usually a bug, not a feature.
-**00:00:31**: >> Ada: So the goal is predictability, not cleverness.
-**00:00:37**: >> Grace: Predictability first. Then, once you trust it, you can build cleverness on top.
-**00:00:46**: >> Ada: That's a good place to end. Thanks for joining.
-**00:00:50**: >> Grace: Thanks for having me.`,
-};
-const demoBtn = document.getElementById("demo-btn");
-if (demoBtn) {
-  demoBtn.addEventListener("click", () => {
-    const form = document.getElementById("preview-form");
-    // Make sure the paste tab is active so the text input is the one submitted.
-    document.querySelector('.tab[data-tab="paste"]').click();
-    form.title.value = DEMO.title;
-    form.transcript.value = DEMO.transcript;
-    form.owns.checked = true;
-    form.scrollIntoView({ behavior: "smooth", block: "center" });
-    form.requestSubmit();
-  });
-}
-
-// ---- Tabs ----
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => {
-      const on = t === tab;
-      t.classList.toggle("active", on);
-      t.setAttribute("aria-selected", String(on)); // keep SR state in sync
-    });
-    const which = tab.dataset.tab;
-    document.querySelectorAll(".tab-panel").forEach((p) =>
-      p.classList.toggle("hidden", p.dataset.panel !== which)
-    );
-  });
-});
 
 // ---- Preview ----
 $("#preview-form").addEventListener("submit", async (e) => {
@@ -105,16 +56,22 @@ $("#preview-form").addEventListener("submit", async (e) => {
   const btn = form.querySelector("button[type=submit]");
   const label = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Building your preview…";
+  btn.textContent = "Generating EPUB…";
 
   try {
+    const sourceUrl = (form.source_url?.value || "").trim();
+    const fileInput = form.file;
+    const hasFile = Boolean(fileInput && fileInput.files && fileInput.files.length);
+    const hasTranscript = Boolean((form.transcript?.value || "").trim());
+    if (!sourceUrl && !hasFile && !hasTranscript) {
+      throw new Error("Enter a YouTube URL or upload a transcript file.");
+    }
+
     const fd = new FormData(form);
     // Checkbox → explicit string the backend understands.
     fd.set("owns", form.owns.checked ? "true" : "");
-    // Only send the active input (avoid empty file overwriting pasted text).
-    const activeTab = document.querySelector(".tab.active").dataset.tab;
-    if (activeTab === "paste") fd.delete("file");
-    else fd.delete("transcript");
+    if (!hasFile) fd.delete("file");
+    if (!hasTranscript) fd.delete("transcript");
 
     const res = await fetch("/api/preview", { method: "POST", body: fd });
     const data = await res.json();
@@ -122,7 +79,7 @@ $("#preview-form").addEventListener("submit", async (e) => {
     CURRENT_JOB = data;
     renderResult(data);
   } catch (ex) {
-    err.textContent = ex.message || "Something went wrong. Try again, or email hello@talktobook.example if it keeps happening.";
+    err.textContent = ex.message || `Something went wrong. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"} if it keeps happening.`;
     err.hidden = false;
   } finally {
     btn.disabled = false;
@@ -161,7 +118,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.detail || "Unlock failed.");
 
     if (data.checkout_url) {
-      window.location.href = data.checkout_url; // Stripe Checkout
+      window.location.href = data.checkout_url; // Polar Checkout
       return;
     }
     if (data.paid && data.downloads) {
@@ -169,10 +126,10 @@ $("#unlock-form").addEventListener("submit", async (e) => {
       return;
     }
     // Intent-capture mode (payments not wired yet).
-    msg.textContent = data.message || "Thanks — we saved your interest.";
+    msg.textContent = data.message || "Thanks. We saved your interest.";
     msg.hidden = false;
   } catch (ex) {
-    msg.textContent = ex.message || "Couldn't unlock. Try again, or email hello@talktobook.example.";
+    msg.textContent = ex.message || `Couldn't unlock. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"}.`;
     msg.classList.add("err");
     msg.hidden = false;
   } finally {
@@ -190,5 +147,28 @@ function renderDownloads(downloads) {
   msg.hidden = false;
 }
 
-loadConfig();
-loadSamples();
+// A canceled Polar checkout returns the visitor to /?canceled=<job_id>. Restore
+// their preview and unlock panel instead of dropping them on a blank homepage.
+async function restoreCanceledJob() {
+  const jobId = new URLSearchParams(location.search).get("canceled");
+  if (!jobId) return;
+  history.replaceState(null, "", location.pathname + location.hash);
+  try {
+    const res = await fetch(`/api/job/${encodeURIComponent(jobId)}`);
+    if (!res.ok) return;
+    const job = await res.json();
+    if (!job || !job.preview) return;
+    CURRENT_JOB = job;
+    renderResult(job);
+    const msg = $("#unlock-msg");
+    if (msg) {
+      msg.textContent = "Checkout canceled. Your preview is still here whenever you're ready.";
+      msg.classList.remove("err");
+      msg.hidden = false;
+    }
+  } catch (_) { /* leave the page as-is */ }
+}
+
+// loadConfig never rejects (it catches internally), so restore always runs —
+// after config resolves, so the unlock CTA label is settled deterministically.
+loadConfig().then(restoreCanceledJob);

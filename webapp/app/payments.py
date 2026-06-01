@@ -1,93 +1,139 @@
-"""Stripe Checkout (one-time unlock) with a no-keys intent-capture fallback.
+"""Polar Checkout for the monthly creator plan.
 
-When STRIPE_SECRET_KEY is unset the app can't take live payments — the PRD's
-explicit "read demand before payments are wired" phase. In that mode
-``create_checkout`` returns an ``intent`` marker instead of a redirect URL, and
-the caller records the email as a demand signal.
+When Polar isn't configured the app stays in intent-capture mode: unlock clicks
+persist the email but do not charge. Live mode creates a hosted Polar checkout
+session for the configured recurring product and fulfills clean editions when
+the subscription is active.
 """
 
 from __future__ import annotations
 
+from email.utils import parseaddr
+
+import requests
+
 from . import config
 
 try:
-    import stripe  # type: ignore
-except ImportError:  # keep importable without the dependency
-    stripe = None
+    from polar_sdk.webhooks import WebhookVerificationError, validate_event
+except ImportError:  # keep local preview mode importable before deps install
+    WebhookVerificationError = Exception
+    validate_event = None
+
+
+class PaymentError(RuntimeError):
+    """Raised when a configured payment provider cannot create/verify checkout."""
+
+
+def _compact(d: dict) -> dict:
+    return {k: v for k, v in d.items() if v not in ("", None)}
+
+
+def _auth_headers() -> dict:
+    return {
+        "Authorization": f"Bearer {config.POLAR_ACCESS_TOKEN}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+
+def normalized_email(email: str) -> str:
+    parsed = parseaddr(email or "")[1].strip().lower()
+    return parsed
 
 
 def create_checkout(job, email: str) -> dict:
-    """Create a one-time Checkout Session, or signal intent-capture mode.
+    """Create a Polar Checkout session, or signal intent-capture mode.
 
-    Returns either ``{"url": <checkout_url>, "session_id": ...}`` or
-    ``{"intent": True}`` when Stripe isn't configured.
+    Returns either ``{"url": <checkout_url>, "checkout_id": ...}`` or
+    ``{"intent": True}`` when Polar isn't configured.
     """
-    if not config.stripe_enabled() or stripe is None:
+    if not config.polar_enabled():
         return {"intent": True}
 
-    stripe.api_key = config.STRIPE_SECRET_KEY
-    session = stripe.checkout.Session.create(
-        mode="payment",
-        customer_email=email or None,
-        line_items=[{
-            "price_data": {
-                "currency": config.CURRENCY,
-                "unit_amount": config.UNLOCK_PRICE_CENTS,
-                "product_data": {
-                    "name": f"{config.APP_NAME} — unlock “{job.title}”",
-                    "description": "Clean, branded edition · EPUB + PDF + Kindle, watermark removed.",
-                },
-            },
-            "quantity": 1,
-        }],
-        metadata={"job_id": job.id},
-        success_url=f"{config.PUBLIC_URL}/success?job={job.id}&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{config.PUBLIC_URL}/?canceled={job.id}",
-    )
-    return {"url": session.url, "session_id": session.id}
-
-
-def verify_webhook(payload: bytes, sig_header: str):
-    """Validate and parse a Stripe webhook event. Returns the event or None."""
-    if stripe is None or not config.STRIPE_WEBHOOK_SECRET:
-        return None
+    customer_email = normalized_email(email)
+    payload = _compact({
+        "products": [config.POLAR_PRODUCT_ID],
+        "customer_email": customer_email or None,
+        "external_customer_id": customer_email or None,
+        "metadata": {
+            "job_id": job.id,
+            "email": customer_email,
+        },
+        "allow_discount_codes": False,
+        "success_url": f"{config.PUBLIC_URL}/success?job={job.id}&checkout_id={{CHECKOUT_ID}}",
+        "return_url": f"{config.PUBLIC_URL}/?canceled={job.id}",
+        "currency": config.CURRENCY.lower(),
+    })
     try:
-        return stripe.Webhook.construct_event(
-            payload, sig_header, config.STRIPE_WEBHOOK_SECRET
+        res = requests.post(
+            f"{config.polar_api_base()}/checkouts",
+            headers=_auth_headers(),
+            json=payload,
+            timeout=15,
         )
-    except (ValueError, stripe.error.SignatureVerificationError):  # type: ignore[attr-defined]
+        res.raise_for_status()
+    except requests.RequestException as exc:
+        raise PaymentError("Polar checkout is unavailable.") from exc
+
+    checkout = res.json()
+    if not checkout.get("url") or not checkout.get("id"):
+        raise PaymentError("Polar returned an incomplete checkout session.")
+    return {"url": checkout["url"], "checkout_id": checkout["id"]}
+
+
+def verify_webhook(payload: bytes, headers) -> dict | None:
+    """Validate and parse a Polar webhook event."""
+    if not config.POLAR_WEBHOOK_SECRET or validate_event is None:
         return None
-
-
-def _session_amount_ok(s) -> bool:
-    """A session is acceptable only if it is paid AND for the exact product
-    price/currency — so a cheaper or different-currency session can't fulfill."""
-    return (
-        s.get("payment_status") == "paid"
-        and s.get("amount_total") == config.UNLOCK_PRICE_CENTS
-        and (s.get("currency") or "").lower() == config.CURRENCY.lower()
-    )
-
-
-def webhook_session_ok(session) -> bool:
-    """Validate a webhook checkout.session object before fulfillment."""
-    return _session_amount_ok(session)
-
-
-def session_job_id(session_id: str) -> str | None:
-    """Return the job_id a *paid, correctly-priced* session belongs to, else None.
-
-    Binds the payment to its own job (via Checkout metadata) so a single paid
-    session can't be replayed against a different job to unlock it for free.
-    Used by the success-page poll as a webhook fallback.
-    """
-    if not config.stripe_enabled() or stripe is None:
-        return None
-    stripe.api_key = config.STRIPE_SECRET_KEY
     try:
-        s = stripe.checkout.Session.retrieve(session_id)
+        event = validate_event(
+            body=payload,
+            headers={k: v for k, v in headers.items()},
+            secret=config.POLAR_WEBHOOK_SECRET,
+        )
+        if isinstance(event, dict):
+            return event
+        if hasattr(event, "model_dump"):
+            return event.model_dump()
+        if hasattr(event, "dict"):
+            return event.dict()
+        return {"type": getattr(event, "type", ""), "data": getattr(event, "data", {})}
+    except WebhookVerificationError:
+        return None
     except Exception:
         return None
-    if not _session_amount_ok(s):
+
+
+def _checkout_valid(checkout: dict) -> bool:
+    return (
+        checkout.get("status") == "succeeded"
+        and checkout.get("product_id") == config.POLAR_PRODUCT_ID
+        and (checkout.get("currency") or "").lower() == config.CURRENCY.lower()
+    )
+
+
+def get_checkout(checkout_id: str) -> dict | None:
+    if not config.polar_enabled():
         return None
-    return (s.get("metadata") or {}).get("job_id")
+    try:
+        res = requests.get(
+            f"{config.polar_api_base()}/checkouts/{checkout_id}",
+            headers=_auth_headers(),
+            timeout=15,
+        )
+        res.raise_for_status()
+    except requests.RequestException:
+        return None
+    checkout = res.json()
+    if not _checkout_valid(checkout):
+        return None
+    return checkout
+
+
+def checkout_job_id(checkout_id: str) -> str | None:
+    """Return the job_id a succeeded Polar checkout belongs to, else None."""
+    checkout = get_checkout(checkout_id)
+    if not checkout:
+        return None
+    return (checkout.get("metadata") or {}).get("job_id")

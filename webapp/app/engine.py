@@ -20,11 +20,13 @@ both — see Dockerfile).
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 # Import the existing CLI engine as a library for its pure helpers.
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
@@ -32,7 +34,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 import build as t2e  # noqa: E402  (clean_transcript, detect_speakers, etc.)
 
-BRAND_ACCENT = "#B7FF6E"
+BRAND_ACCENT = "#7F1D1D"
 BRAND_INK = "#0C1211"
 # Credit is never silently dropped: when no creator can be detected, the byline
 # degrades to this rather than vanishing. The author is never user-editable —
@@ -45,9 +47,20 @@ try:
 except ImportError:
     HAS_PILLOW = False
 
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    HAS_YOUTUBE_TRANSCRIPT = True
+except ImportError:
+    YouTubeTranscriptApi = None
+    HAS_YOUTUBE_TRANSCRIPT = False
+
 
 class EngineError(RuntimeError):
     """Raised when a conversion step fails (pandoc/weasyprint/calibre)."""
+
+
+class TranscriptFetchError(RuntimeError):
+    """Raised when a URL transcript cannot be fetched for user-correctable reasons."""
 
 
 # ---------------------------------------------------------------------------
@@ -61,12 +74,120 @@ def capabilities() -> dict:
         "pdf": bool(shutil.which("pandoc") and shutil.which("weasyprint")),
         "azw3": bool(shutil.which("ebook-convert")),
         "cover": HAS_PILLOW,
+        "youtube": HAS_YOUTUBE_TRANSCRIPT,
     }
 
 
 # ---------------------------------------------------------------------------
 # Input normalization
 # ---------------------------------------------------------------------------
+
+def is_youtube_source(url: str) -> bool:
+    """True when the source string is a YouTube URL or video id."""
+    return t2e.extract_video_id((url or "").strip()) is not None
+
+
+def fetch_youtube_source(url: str, language: str = "en") -> dict:
+    """Fetch a YouTube transcript and lightweight metadata for web preview builds."""
+    source = (url or "").strip()
+    video_id = t2e.extract_video_id(source)
+    if not video_id:
+        raise TranscriptFetchError("Only YouTube URLs are supported right now.")
+    if not HAS_YOUTUBE_TRANSCRIPT or YouTubeTranscriptApi is None:
+        raise TranscriptFetchError("YouTube transcript fetching is not installed on this server.")
+
+    api = YouTubeTranscriptApi()
+    try:
+        transcript = api.fetch(video_id, languages=[language])
+    except Exception as e:
+        if e.__class__.__name__ == "NoTranscriptFound":
+            try:
+                transcript = api.fetch(video_id)
+            except Exception as fallback:
+                raise _youtube_fetch_error(fallback) from fallback
+        else:
+            raise _youtube_fetch_error(e) from e
+
+    raw_text = _format_youtube_transcript(transcript)
+    if not raw_text.strip():
+        raise TranscriptFetchError("This video returned an empty transcript.")
+
+    canonical = t2e.canonical_youtube_url(video_id)
+    title, author = _fetch_youtube_metadata(canonical, video_id)
+    return {
+        "title": title,
+        "author": author,
+        "source_url": canonical,
+        "raw_text": raw_text,
+    }
+
+
+def _format_youtube_transcript(transcript) -> str:
+    lines: list[str] = []
+    for entry in transcript:
+        if isinstance(entry, dict):
+            start = float(entry.get("start") or 0)
+            text = str(entry.get("text") or "").strip()
+        else:
+            start = float(getattr(entry, "start", 0) or 0)
+            text = str(getattr(entry, "text", "") or "").strip()
+        if not text:
+            continue
+        minutes = int(start // 60)
+        seconds = int(start % 60)
+        hours = minutes // 60
+        minutes %= 60
+        lines.append(f"**{hours:02d}:{minutes:02d}:{seconds:02d}**: {text}")
+    return "\n".join(lines)
+
+
+def _fetch_youtube_metadata(canonical_url: str, video_id: str) -> tuple[str, str | None]:
+    """Use YouTube oEmbed for title/channel without requiring a Data API key."""
+    try:
+        import requests
+
+        resp = requests.get(
+            "https://www.youtube.com/oembed",
+            params={"url": canonical_url, "format": "json"},
+            headers={"User-Agent": "TalkToBook/1.0"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        title = (data.get("title") or "").strip() or video_id
+        author = (data.get("author_name") or "").strip() or None
+        return title, author
+    except Exception:
+        pass
+
+    try:
+        from urllib.request import Request, urlopen
+
+        qs = urlencode({"url": canonical_url, "format": "json"})
+        req = Request(
+            f"https://www.youtube.com/oembed?{qs}",
+            headers={"User-Agent": "TalkToBook/1.0"},
+        )
+        with urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        title = (data.get("title") or "").strip() or video_id
+        author = (data.get("author_name") or "").strip() or None
+        return title, author
+    except Exception:
+        return video_id, None
+
+
+def _youtube_fetch_error(error: Exception) -> TranscriptFetchError:
+    kind = error.__class__.__name__
+    if kind == "VideoUnavailable":
+        return TranscriptFetchError("That YouTube video is unavailable.")
+    if kind == "TranscriptsDisabled":
+        return TranscriptFetchError("That video has transcripts disabled. Upload a transcript file instead.")
+    if kind == "NoTranscriptFound":
+        return TranscriptFetchError("No transcript was found for that video. Upload captions or a transcript file instead.")
+    if kind == "RequestBlocked":
+        return TranscriptFetchError("YouTube blocked transcript access from this server. Upload a transcript file instead.")
+    return TranscriptFetchError("Could not fetch a transcript for that YouTube URL.")
 
 _VTT_TS = re.compile(r"\d{1,2}:\d{2}(?::\d{2})?[.,]\d{3}\s*-->")
 _CUE_NUM = re.compile(r"^\d+$")
@@ -112,8 +233,7 @@ def normalize_input(text: str, fmt: str) -> str:
 
 WATERMARK = (
     "\n\n----\n\n"
-    "*Made with **TalkToBook** — turn your podcast, talk, or interview into a "
-    "Kindle-ready book.*\n"
+    "*Made with **TalkToBook**. Turn one recorded idea into a lead magnet EPUB.*\n"
 )
 
 

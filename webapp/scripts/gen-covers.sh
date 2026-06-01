@@ -24,7 +24,7 @@ for s in samples.SAMPLES:
 PY
 
 while IFS=$'\t' read -r slug title author; do
-  prompt="Minimalist editorial book cover, portrait 2:3 aspect ratio. The title \"$title\" set large in a clean geometric sans-serif, near-white, in the upper area. Below the title, a single thin horizontal rule in signal-lime #B7FF6E as the only accent, used sparingly. Near the bottom, the byline \"$author\" small in muted grey. Background a dark ink charcoal #0C1211, matte, never pure black. Calm, editorial, high-contrast, generous negative space. No gradients, no neon glow, no glassy panels, no photography, no clutter."
+  prompt="Minimalist editorial book cover, portrait 2:3 aspect ratio. The title \"$title\" set large in a clean serif or restrained sans-serif, deep ink #1E1A17, in the upper area. Below the title, a single thin horizontal rule in oxblood #7F1D1D as the only accent, used sparingly. Near the bottom, the byline \"$author\" small in muted warm grey. Background warm paper #F7F0E5. Calm, editorial, generous negative space. No gradients, no neon glow, no glassy panels, no photography, no clutter."
   echo "→ generating cover: $slug ($MODEL)"
   ai image "$prompt" -m "$MODEL" --size 1024x1536 -o "$OUT/$slug.png" --quiet --no-preview
 done < /tmp/_t2b_samples.tsv

@@ -2,6 +2,8 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 python-multipart>=0.0.9
 Pillow>=10
-stripe>=9
+polar-sdk>=0.25
+requests>=2.32
+youtube-transcript-api>=1.2.4
 # PDF export (paid edition). Pulls system libs (pango/cairo) — see Dockerfile.
 weasyprint>=62

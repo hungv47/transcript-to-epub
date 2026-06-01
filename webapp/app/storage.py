@@ -27,9 +27,11 @@ class Job:
     raw_text: str
     paid: bool = False
     email: str | None = None
-    accent: str = "#B7FF6E"
+    accent: str = "#7F1D1D"
     download_token: str | None = None
-    stripe_session_id: str | None = None
+    checkout_session_id: str | None = None
+    subscription_id: str | None = None
+    polar_customer_id: str | None = None
     # Outputs as {kind: filename}, e.g. {"epub": "book.epub"}.
     preview_outputs: dict = field(default_factory=dict)
     paid_outputs: dict = field(default_factory=dict)
@@ -52,6 +54,14 @@ class Job:
 
 def _meta_path(job_id: str) -> Path:
     return config.JOBS_DIR / job_id / "meta.json"
+
+
+def _subscribers_path() -> Path:
+    return config.JOBS_DIR / "subscribers.json"
+
+
+def normalize_email(email: str | None) -> str:
+    return (email or "").strip().lower()
 
 
 def new_job(*, title: str, author: str | None, source_url: str | None,
@@ -86,4 +96,70 @@ def load(job_id: str) -> Job | None:
     if not p.exists():
         return None
     data = json.loads(p.read_text(encoding="utf-8"))
-    return Job(**data)
+    fields = set(Job.__dataclass_fields__)
+    return Job(**{k: v for k, v in data.items() if k in fields})
+
+
+def _read_subscribers() -> dict:
+    p = _subscribers_path()
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def _write_subscribers(data: dict) -> None:
+    config.JOBS_DIR.mkdir(parents=True, exist_ok=True)
+    _subscribers_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def subscriber_active(email: str | None) -> bool:
+    key = normalize_email(email)
+    if not key:
+        return False
+    rec = _read_subscribers().get(key) or {}
+    return bool(rec.get("active"))
+
+
+def mark_subscriber_active(
+    email: str | None,
+    *,
+    customer_id: str | None = None,
+    subscription_id: str | None = None,
+    checkout_id: str | None = None,
+) -> None:
+    key = normalize_email(email)
+    if not key:
+        return
+    data = _read_subscribers()
+    rec = data.get(key, {})
+    rec.update({
+        "email": key,
+        "active": True,
+        "customer_id": customer_id or rec.get("customer_id"),
+        "subscription_id": subscription_id or rec.get("subscription_id"),
+        "checkout_id": checkout_id or rec.get("checkout_id"),
+        "updated_at": time.time(),
+    })
+    data[key] = rec
+    _write_subscribers(data)
+
+
+def mark_subscriber_inactive(email: str | None = None, *, subscription_id: str | None = None) -> None:
+    data = _read_subscribers()
+    keys: list[str] = []
+    if email:
+        keys.append(normalize_email(email))
+    if subscription_id:
+        keys.extend(
+            key for key, rec in data.items()
+            if rec.get("subscription_id") == subscription_id
+        )
+    for key in set(k for k in keys if k):
+        if key in data:
+            data[key]["active"] = False
+            data[key]["updated_at"] = time.time()
+    if keys:
+        _write_subscribers(data)

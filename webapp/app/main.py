@@ -1,24 +1,27 @@
 """TalkToBook — FastAPI service wrapping the transcript-to-epub engine.
 
-Flow: paste/upload a transcript → free preview EPUB (watermarked, plain cover)
-→ $9 unlock → clean, branded EPUB + PDF + Kindle. No accounts; jobs live on disk
-keyed by an unguessable id, paid files gated behind a separate download token.
+Flow: YouTube URL or transcript upload → free EPUB preview (watermarked, plain
+cover) → $7/month creator plan → clean, branded EPUB + PDF + Kindle. No
+accounts yet; jobs live on disk keyed by an unguessable id, and active creator
+plans are tracked by email.
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import re
 import secrets
 import time
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, engine, payments, samples, storage
+from . import config, engine, payments, storage
 
 app = FastAPI(title=f"{config.APP_NAME} API")
 
@@ -53,8 +56,22 @@ def _is_https(request: Request) -> bool:
     return request.headers.get("x-forwarded-proto", "").lower() == "https"
 
 
+def _is_local_request(request: Request) -> bool:
+    host = (request.url.hostname or "").lower()
+    return host in {"localhost", "127.0.0.1", "::1"}
+
+
+def _https_redirect_url(request: Request) -> str:
+    req = urlsplit(str(request.url))
+    public = urlsplit(config.PUBLIC_URL)
+    netloc = public.netloc if public.scheme == "https" and public.netloc else req.netloc
+    return urlunsplit(("https", netloc, req.path, req.query, req.fragment))
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
+    if config.FORCE_HTTPS and not _is_https(request) and not _is_local_request(request):
+        return RedirectResponse(_https_redirect_url(request), status_code=308)
     response = await call_next(request)
     for k, v in _DOWNLOAD_HARDENING.items():
         response.headers.setdefault(k, v)
@@ -145,12 +162,13 @@ def _job_public(job: storage.Job) -> dict:
     return out
 
 
-def fulfill(job: storage.Job) -> None:
+async def fulfill(job: storage.Job) -> None:
     """Build the paid edition and gate it behind a fresh download token."""
     if job.paid and job.paid_outputs:
         return
     cover_path = next(iter(job.dir.glob("uploaded_cover.*")), None)
-    result = engine.generate(
+    result = await asyncio.to_thread(
+        engine.generate,
         job.paid_dir,
         raw_text=job.raw_text,
         fmt=job.fmt,
@@ -219,38 +237,13 @@ async def public_config():
         "app_name": config.APP_NAME,
         "price_cents": config.UNLOCK_PRICE_CENTS,
         "currency": config.CURRENCY,
-        "stripe_enabled": config.stripe_enabled(),
+        "payment_provider": "polar",
+        "payments_enabled": config.payments_enabled(),
         "allow_free_unlock": config.ALLOW_FREE_UNLOCK,
         "capabilities": engine.capabilities(),
         "contact_email": config.CONTACT_EMAIL,
         "dmca_email": config.DMCA_EMAIL,
     }
-
-
-# ---------------------------------------------------------------------------
-# Sample library (original, zero-IP-risk demo books)
-# ---------------------------------------------------------------------------
-
-@app.get("/api/samples")
-async def list_samples():
-    return {"samples": samples.get_manifest()}
-
-
-@app.get("/api/sample/{slug}/{name}")
-async def sample_file(slug: str, name: str):
-    path = samples.file_for(slug, name)
-    if not path:
-        raise HTTPException(404, "Not found.")
-    media = {
-        "book.epub": "application/epub+zip",
-        "book.pdf": "application/pdf",
-        "cover.png": "image/png",
-    }.get(name, "application/octet-stream")
-    # Inline for cover thumbnails; download for the book files.
-    if name == "cover.png":
-        return FileResponse(path, media_type=media)
-    safe = re.sub(r"[^\w\- ]", "", slug)[:60] or "sample"
-    return FileResponse(path, media_type=media, filename=f"{safe}{Path(name).suffix}")
 
 
 # ---------------------------------------------------------------------------
@@ -269,6 +262,8 @@ async def create_preview(
         raise HTTPException(400, "You must confirm you own or have rights to this content.")
 
     raw_text = transcript or ""
+    source_url = (source_url or "").strip()
+    author_hint = None
     filename = None
     if file is not None and file.filename:
         filename = file.filename
@@ -279,26 +274,38 @@ async def create_preview(
         if len(data) > config.MAX_UPLOAD_BYTES:
             raise HTTPException(400, "File too large.")
         raw_text = data.decode("utf-8", errors="replace")
+    elif source_url:
+        if not engine.is_youtube_source(source_url):
+            raise HTTPException(400, "Only YouTube URLs are supported right now. Upload a transcript file for other sources.")
+        try:
+            fetched = await asyncio.to_thread(engine.fetch_youtube_source, source_url)
+        except engine.TranscriptFetchError as e:
+            raise HTTPException(400, str(e))
+        raw_text = fetched["raw_text"]
+        title = title or fetched["title"]
+        author_hint = fetched["author"]
+        source_url = fetched["source_url"]
 
     raw_text = raw_text.strip()
     if not raw_text:
-        raise HTTPException(400, "Paste a transcript or upload a file.")
+        raise HTTPException(400, "Enter a YouTube URL or upload a transcript file.")
     if len(raw_text) > config.MAX_TRANSCRIPT_CHARS:
         raise HTTPException(400, "Transcript is too long for the preview.")
 
     fmt = detect_format(raw_text, filename)
     # Author is auto-detected from the transcript and not user-editable — the
     # original creators are always credited (falling back to a generic credit).
-    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, None)
+    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, author_hint)
     author_d = author_d or engine.UNKNOWN_CREATORS
 
     job = storage.new_job(
         title=title_d, author=author_d,
-        source_url=(source_url or "").strip() or None,
+        source_url=source_url or None,
         fmt=fmt, raw_text=raw_text,
     )
     try:
-        result = engine.generate(
+        result = await asyncio.to_thread(
+            engine.generate,
             job.preview_dir, raw_text=raw_text, fmt=fmt,
             title=title_d, author=author_d,
             source_url=job.source_url, paid=False,
@@ -345,20 +352,28 @@ async def unlock(
                 old.unlink()
             (job.dir / f"uploaded_cover.{ext}").write_bytes(data)
     storage.save(job)
-    _event("unlock_click", job_id=job.id, email=bool(job.email), stripe=config.stripe_enabled())
+    _event("unlock_click", job_id=job.id, email=bool(job.email), provider="polar", live=config.payments_enabled())
 
     # Already paid (idempotent re-click).
     if job.paid:
         return _job_public(job)
 
-    # Dev escape hatch: fulfill without paying.
-    if config.ALLOW_FREE_UNLOCK and not config.stripe_enabled():
-        fulfill(job)
+    # Active creator plan: email-linked unlimited clean editions.
+    if storage.subscriber_active(job.email):
+        await fulfill(job)
         return _job_public(job)
 
-    result = payments.create_checkout(job, job.email or "")
+    # Dev escape hatch: fulfill without paying.
+    if config.ALLOW_FREE_UNLOCK and not config.payments_enabled():
+        await fulfill(job)
+        return _job_public(job)
+
+    try:
+        result = payments.create_checkout(job, job.email or "")
+    except payments.PaymentError as e:
+        raise HTTPException(502, str(e))
     if result.get("url"):
-        job.stripe_session_id = result.get("session_id")
+        job.checkout_session_id = result.get("checkout_id")
         storage.save(job)
         return {"checkout_url": result["url"]}
 
@@ -367,39 +382,104 @@ async def unlock(
     _event("unlock_intent", job_id=job.id, email=bool(job.email))
     return {
         "intent": True,
-        "message": "Payments are launching shortly — we saved your email and will send your unlock link the moment they go live.",
+        "message": "Checkout is launching shortly. We saved your email and will send your creator plan link when it goes live.",
     }
 
 
+def _event_email(data: dict) -> str | None:
+    customer = data.get("customer") or {}
+    return data.get("customer_email") or data.get("email") or customer.get("email")
+
+
+async def _activate_subscription_for_job(data: dict) -> None:
+    product_id = data.get("product_id") or (data.get("product") or {}).get("id")
+    if product_id and product_id != config.POLAR_PRODUCT_ID:
+        return
+    metadata = data.get("metadata") or {}
+    job_id = metadata.get("job_id")
+    checkout_id = data.get("checkout_id") or data.get("id")
+    subscription = data.get("subscription") or {}
+    subscription_id = data.get("subscription_id") or data.get("id") or subscription.get("id")
+    customer = data.get("customer") or {}
+    email = _event_email(data) or metadata.get("email")
+
+    storage.mark_subscriber_active(
+        email,
+        customer_id=data.get("customer_id") or customer.get("id"),
+        subscription_id=subscription_id,
+        checkout_id=checkout_id,
+    )
+
+    job = storage.load(job_id) if job_id else None
+    if not job and checkout_id:
+        # Some webhook payloads carry metadata on the checkout/order, while the
+        # success-page fallback can reconcile directly from the checkout record.
+        checkout_job_id = payments.checkout_job_id(checkout_id)
+        job = storage.load(checkout_job_id) if checkout_job_id else None
+    if job:
+        job.checkout_session_id = checkout_id or job.checkout_session_id
+        job.subscription_id = subscription_id or job.subscription_id
+        job.polar_customer_id = data.get("customer_id") or customer.get("id") or job.polar_customer_id
+        job.email = job.email or email
+        storage.save(job)
+        await fulfill(job)
+
+
 @app.post("/api/webhook")
-async def stripe_webhook(request: Request):
+async def polar_webhook(request: Request):
     payload = await request.body()
-    sig = request.headers.get("stripe-signature", "")
-    event = payments.verify_webhook(payload, sig)
+    event = payments.verify_webhook(payload, request.headers)
     if event is None:
         raise HTTPException(400, "Invalid webhook signature.")
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        job_id = (session.get("metadata") or {}).get("job_id")
-        job = storage.load(job_id) if job_id else None
-        # Only fulfill when the session is genuinely paid for the right amount.
-        if job and payments.webhook_session_ok(session):
-            job.stripe_session_id = session.get("id")
-            job.email = job.email or (session.get("customer_details") or {}).get("email")
-            fulfill(job)
+    event_type = event.get("type")
+    data = event.get("data") or {}
+
+    if event_type in {"order.paid", "subscription.active", "subscription.uncanceled"}:
+        await _activate_subscription_for_job(data)
+    elif event_type == "subscription.revoked":
+        storage.mark_subscriber_inactive(_event_email(data), subscription_id=data.get("id"))
+    elif event_type == "customer.state_changed":
+        email = data.get("email")
+        active = [
+            s for s in data.get("active_subscriptions", [])
+            if s.get("product_id") == config.POLAR_PRODUCT_ID
+        ]
+        if active:
+            s = active[0]
+            storage.mark_subscriber_active(
+                email,
+                customer_id=data.get("id"),
+                subscription_id=s.get("id"),
+                checkout_id=s.get("checkout_id"),
+            )
+        else:
+            storage.mark_subscriber_inactive(email)
     return JSONResponse({"received": True})
 
 
 @app.get("/api/job/{job_id}")
-async def job_status(job_id: str, session_id: str | None = None):
+async def job_status(job_id: str, checkout_id: str | None = None, session_id: str | None = None):
     job = storage.load(job_id)
     if not job:
         raise HTTPException(404, "Unknown job.")
     # Reconcile a returning Checkout customer if the webhook hasn't landed yet.
-    # The session must belong to THIS job (metadata binding), so a paid session
+    # The checkout must belong to THIS job (metadata binding), so a paid checkout
     # for one job can't be replayed to unlock another.
-    if not job.paid and session_id and payments.session_job_id(session_id) == job.id:
-        fulfill(job)
+    checkout_id = checkout_id or session_id
+    if not job.paid and checkout_id and payments.checkout_job_id(checkout_id) == job.id:
+        checkout = payments.get_checkout(checkout_id) or {}
+        job.checkout_session_id = checkout_id
+        job.subscription_id = checkout.get("subscription_id") or job.subscription_id
+        job.polar_customer_id = checkout.get("customer_id") or job.polar_customer_id
+        if job.email:
+            storage.mark_subscriber_active(
+                job.email,
+                customer_id=job.polar_customer_id,
+                subscription_id=job.subscription_id,
+                checkout_id=checkout_id,
+            )
+        storage.save(job)
+        await fulfill(job)
     return _job_public(job)
 
 
