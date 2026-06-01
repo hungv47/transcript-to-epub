@@ -23,6 +23,10 @@ STRIPE_PUBLISHABLE_KEY = os.environ.get("STRIPE_PUBLISHABLE_KEY", "").strip()
 # Dev escape hatch: unlock without paying (local demos only). Never set in prod.
 ALLOW_FREE_UNLOCK = os.environ.get("ALLOW_FREE_UNLOCK", "").lower() in ("1", "true", "yes")
 
+# Legal / contact (shown on the Terms page; set a real address before launch).
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "hello@talktobook.example")
+DMCA_EMAIL = os.environ.get("DMCA_EMAIL", "dmca@talktobook.example")
+
 # Input guardrails.
 MAX_TRANSCRIPT_CHARS = int(os.environ.get("MAX_TRANSCRIPT_CHARS", str(800_000)))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024 * 1024)))

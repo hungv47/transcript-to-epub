@@ -41,8 +41,9 @@
         </p>
         <div class="hero-cta" data-reveal>
           <a class="btn btn-primary" href="#start">Make my book — free preview</a>
-          <span class="cta-note">No account. No card to preview.</span>
+          <a class="btn btn-hero-ghost" href="#samples">Read a sample first</a>
         </div>
+        <p class="cta-note" data-reveal>No account. No card to preview. Or download a finished sample below.</p>
       </div>
 
       <!-- Built mockup of the actual output: cover + open reading page -->
@@ -69,8 +70,17 @@
     </div>
   </section>
 
+  <!-- Sample library -->
+  <section id="samples" class="section">
+    <header class="section-head">
+      <h2 class="section-title" data-reveal>Read a sample first</h2>
+      <p class="section-sub" data-reveal>Short books we made with TalkToBook. Download one, open it in your reader, and see the real output before you paste anything. These are original works — free to keep.</p>
+    </header>
+    <div id="sample-grid" class="samples" data-reveal></div>
+  </section>
+
   <!-- How it works -->
-  <section id="how" class="section">
+  <section id="how" class="section section-muted">
     <header class="section-head">
       <h2 class="section-title" data-reveal>Three steps, about a minute</h2>
     </header>
@@ -94,7 +104,7 @@
   </section>
 
   <!-- Examples -->
-  <section id="examples" class="section section-muted">
+  <section id="examples" class="section">
     <header class="section-head">
       <h2 class="section-title" data-reveal>From rambling transcript to clean page</h2>
       <p class="section-sub" data-reveal>Honest before and after. The engine cleans timestamps, merges fragments into paragraphs, and sets interviewer turns apart. It won't rewrite your ideas.</p>
@@ -124,7 +134,7 @@ by being boring in the best way.</pre>
   </section>
 
   <!-- The app -->
-  <section id="start" class="section">
+  <section id="start" class="section section-muted">
     <header class="section-head">
       <h2 class="section-title" data-reveal>Make your book</h2>
       <p class="section-sub" data-reveal>Paste a transcript or drop a file. You'll get a real EPUB to read in seconds.</p>
@@ -161,7 +171,7 @@ by being boring in the best way.</pre>
 
         <label class="checkbox">
           <input type="checkbox" name="owns" />
-          <span>I own or have the rights to this content.</span>
+          <span>I own or have the rights to this content, and I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Acceptable Use</a>.</span>
         </label>
 
         <button type="submit" class="btn btn-primary btn-block">Generate free preview</button>
@@ -220,7 +230,7 @@ by being boring in the best way.</pre>
   </section>
 
   <!-- Pricing -->
-  <section id="pricing" class="section section-muted">
+  <section id="pricing" class="section">
     <header class="section-head">
       <h2 class="section-title" data-reveal>Simple pricing</h2>
       <p class="section-sub" data-reveal>Preview every book for free. Pay only when you're ready to publish one.</p>
@@ -252,7 +262,7 @@ by being boring in the best way.</pre>
   </section>
 
   <!-- FAQ -->
-  <section class="section faq">
+  <section class="section section-muted faq">
     <header class="section-head">
       <h2 class="section-title" data-reveal>Questions</h2>
     </header>
@@ -267,6 +277,11 @@ by being boring in the best way.</pre>
   <footer class="site-footer">
     <span class="wordmark">Talk<span>To</span>Book</span>
     <p>Turn your podcast, talk, or interview into a Kindle-ready book.</p>
+    <nav class="footer-links">
+      <a href="/terms">Terms &amp; Acceptable Use</a>
+      <a href="/terms#dmca">Copyright / DMCA</a>
+    </nav>
+    <p class="footer-fine">A tool for your own content. You're responsible for the rights to anything you upload.</p>
   </footer>
 
   <script src="/static/app.js"></script>
