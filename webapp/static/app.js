@@ -18,6 +18,16 @@ async function loadConfig() {
       const el = document.getElementById(id);
       if (el) el.textContent = p;
     });
+    if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {
+      const form = document.getElementById("preview-form");
+      const err = document.getElementById("preview-error");
+      const btn = form?.querySelector("button[type=submit]");
+      if (btn) btn.disabled = true;
+      if (err) {
+        err.textContent = "EPUB generation is temporarily unavailable on this server.";
+        err.hidden = false;
+      }
+    }
   } catch (_) { /* defaults are fine */ }
 }
 
@@ -55,47 +65,6 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-// ---- Try a demo (original, zero-IP content) ----
-const DEMO = {
-  title: "A Short Conversation on Craft",
-  transcript: `**00:00:00**: >> Ada: Welcome back. Today we're talking about how good tools quietly disappear into the work.
-**00:00:08**: >> Ada: The best ones never ask for attention. You just reach for them.
-**00:00:15**: >> Grace: Right. A tool earns trust by being boring in the best way. It does the same thing every time.
-**00:00:24**: >> Grace: When it surprises you, that's usually a bug, not a feature.
-**00:00:31**: >> Ada: So the goal is predictability, not cleverness.
-**00:00:37**: >> Grace: Predictability first. Then, once you trust it, you can build cleverness on top.
-**00:00:46**: >> Ada: That's a good place to end. Thanks for joining.
-**00:00:50**: >> Grace: Thanks for having me.`,
-};
-const demoBtn = document.getElementById("demo-btn");
-if (demoBtn) {
-  demoBtn.addEventListener("click", () => {
-    const form = document.getElementById("preview-form");
-    // Make sure the paste tab is active so the text input is the one submitted.
-    document.querySelector('.tab[data-tab="paste"]').click();
-    form.title.value = DEMO.title;
-    form.transcript.value = DEMO.transcript;
-    form.owns.checked = true;
-    form.scrollIntoView({ behavior: "smooth", block: "center" });
-    form.requestSubmit();
-  });
-}
-
-// ---- Tabs ----
-document.querySelectorAll(".tab").forEach((tab) => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach((t) => {
-      const on = t === tab;
-      t.classList.toggle("active", on);
-      t.setAttribute("aria-selected", String(on)); // keep SR state in sync
-    });
-    const which = tab.dataset.tab;
-    document.querySelectorAll(".tab-panel").forEach((p) =>
-      p.classList.toggle("hidden", p.dataset.panel !== which)
-    );
-  });
-});
-
 // ---- Preview ----
 $("#preview-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -105,16 +74,22 @@ $("#preview-form").addEventListener("submit", async (e) => {
   const btn = form.querySelector("button[type=submit]");
   const label = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Building your preview…";
+  btn.textContent = "Generating EPUB…";
 
   try {
+    const sourceUrl = (form.source_url?.value || "").trim();
+    const fileInput = form.file;
+    const hasFile = Boolean(fileInput && fileInput.files && fileInput.files.length);
+    const hasTranscript = Boolean((form.transcript?.value || "").trim());
+    if (!sourceUrl && !hasFile && !hasTranscript) {
+      throw new Error("Enter a YouTube URL or upload a transcript file.");
+    }
+
     const fd = new FormData(form);
     // Checkbox → explicit string the backend understands.
     fd.set("owns", form.owns.checked ? "true" : "");
-    // Only send the active input (avoid empty file overwriting pasted text).
-    const activeTab = document.querySelector(".tab.active").dataset.tab;
-    if (activeTab === "paste") fd.delete("file");
-    else fd.delete("transcript");
+    if (!hasFile) fd.delete("file");
+    if (!hasTranscript) fd.delete("transcript");
 
     const res = await fetch("/api/preview", { method: "POST", body: fd });
     const data = await res.json();

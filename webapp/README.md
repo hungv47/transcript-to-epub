@@ -1,9 +1,9 @@
 # TalkToBook — web MVP
 
-Thin web wrapper around the `scripts/build.py` transcript→EPUB engine. Paste or
-upload a transcript → free preview EPUB → `$9` unlock → clean, branded
-**EPUB + PDF + Kindle**. No accounts; jobs live on disk, paid files gated behind
-a separate download token.
+Thin web wrapper around the `scripts/build.py` transcript→EPUB engine. Paste a
+YouTube URL, or upload a transcript/caption file → free preview EPUB → `$9`
+unlock → clean, branded **EPUB + PDF + Kindle**. No accounts; jobs live on disk,
+paid files gated behind a separate download token.
 
 See [`../PRD.local.md`](../PRD.local.md) for the product rationale, pricing, and
 validation plan.
@@ -30,10 +30,11 @@ uvicorn app.main:app --reload
 
 Open http://localhost:8000.
 
-**System deps:** `pandoc` (EPUB, required). For paid formats: `weasyprint` (PDF,
-in `requirements.txt` but needs pango/cairo system libs) and `calibre`'s
+**System deps:** `pandoc` (EPUB, required). YouTube transcript fetches use
+`youtube-transcript-api`. For paid formats: `weasyprint` (PDF, in
+`requirements.txt` but needs pango/cairo system libs) and `calibre`'s
 `ebook-convert` (Kindle AZW3). Missing tools degrade gracefully — `GET
-/api/config` reports `capabilities`. The Dockerfile installs all three.
+/api/config` reports `capabilities`. The Dockerfile installs the system tools.
 
 ## Payments
 
@@ -59,7 +60,7 @@ stripe listen --forward-to localhost:8000/api/webhook
 |---|---|---|
 | GET | `/` | Landing + converter |
 | GET | `/api/config` | Price, currency, Stripe on/off, format capabilities |
-| POST | `/api/preview` | Build free preview (multipart) |
+| POST | `/api/preview` | Build free preview from a YouTube URL or uploaded transcript file |
 | POST | `/api/unlock` | Start checkout / capture intent / dev-fulfill |
 | POST | `/api/webhook` | Stripe payment fulfillment |
 | GET | `/api/job/{id}` | Job status + paid download links |

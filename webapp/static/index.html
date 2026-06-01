@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0C1211" />
 
-  <title>TalkToBook — Turn a podcast into a book</title>
-  <meta name="description" content="Paste a transcript, get a designed ebook. Free preview, $9 to unlock the clean, branded edition in EPUB, PDF, and Kindle." />
+  <title>TalkToBook — Turn a YouTube talk into a book</title>
+  <meta name="description" content="Paste a YouTube URL, get a designed EPUB. Free preview, $9 to unlock the clean, branded edition in EPUB, PDF, and Kindle." />
   <meta name="keywords" content="podcast to book, transcript to ebook, youtube to book, turn podcast into book, transcript to epub, interview to book, spoken word to book, kindle ready ebook" />
   <meta name="robots" content="index,follow" />
   <meta name="author" content="TalkToBook" />
@@ -18,8 +18,8 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="TalkToBook" />
-  <meta property="og:title" content="TalkToBook — Turn a podcast into a book" />
-  <meta property="og:description" content="Paste a transcript, get a designed ebook. Free preview, $9 to unlock the clean, branded edition." />
+  <meta property="og:title" content="TalkToBook — Turn a YouTube talk into a book" />
+  <meta property="og:description" content="Paste a YouTube URL, get a designed EPUB. Free preview, $9 to unlock the clean, branded edition." />
   <meta property="og:url" content="https://talktobook.com/" />
   <meta property="og:image" content="https://talktobook.com/static/og.png" />
   <meta property="og:image:width" content="1200" />
@@ -28,8 +28,8 @@
 
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="TalkToBook — Turn a podcast into a book" />
-  <meta name="twitter:description" content="Paste a transcript, get a designed ebook. Free preview, $9 to unlock the clean, branded edition." />
+  <meta name="twitter:title" content="TalkToBook — Turn a YouTube talk into a book" />
+  <meta name="twitter:description" content="Paste a YouTube URL, get a designed EPUB. Free preview, $9 to unlock the clean, branded edition." />
   <meta name="twitter:image" content="https://talktobook.com/static/og.png" />
 
   <!-- Fonts -->
@@ -67,7 +67,7 @@
         "applicationSubCategory": "Ebook Generator",
         "operatingSystem": "Web",
         "url": "https://talktobook.com/",
-        "description": "Turn a podcast, talk, or interview into a designed, Kindle-ready ebook. Paste a transcript, preview free, unlock the clean, branded edition.",
+        "description": "Turn a YouTube talk, podcast, or interview into a designed, Kindle-ready ebook. Paste a URL, preview free, unlock the clean, branded edition.",
         "offers": [
           {
             "@type": "Offer",
@@ -84,7 +84,7 @@
           }
         ],
         "featureList": [
-          "Paste a transcript or upload .txt, .md, .srt, .vtt",
+          "Paste a YouTube URL or upload .txt, .md, .srt, .vtt",
           "Designed EPUB preview, free",
           "Cleans timestamps and speaker markers",
           "Your cover image and accent colour",
@@ -159,16 +159,16 @@
     <div class="hero-inner">
       <div class="hero-copy">
         <p class="kicker" data-reveal><span class="dot"></span>For podcasters, speakers, and course makers</p>
-        <h1 data-reveal>Turn a <span class="accent">podcast</span> into a book your readers finish.</h1>
+        <h1 data-reveal>Turn a <span class="accent">YouTube talk</span> into a book your readers finish.</h1>
         <p class="lede" data-reveal>
-          Paste a transcript of your own talk. We clean it, set the pages, and hand you a designed ebook —
-          a real EPUB, with a cover. Preview free, unlock once to drop the watermark and ship to Kindle.
+          Paste the URL for your own video. We fetch the transcript, clean it, set the pages, and hand you
+          a designed EPUB with a cover. Preview free, unlock once to drop the watermark and ship to Kindle.
         </p>
         <div class="hero-cta" data-reveal>
           <a class="btn btn-primary" href="#start">Make a book — free</a>
           <a class="btn btn-hero-ghost" href="#samples">Read a sample first</a>
         </div>
-        <p class="cta-note" data-reveal>No account. No card for the preview. Three originals you can download below.</p>
+        <p class="cta-note" data-reveal>No account. No card for the preview. Works when the video has captions.</p>
       </div>
 
       <div class="book-stage" data-reveal aria-hidden="true">
@@ -204,47 +204,35 @@
   <!-- The app -->
   <section id="start" class="section section--app">
     <header class="section-head section-head--center" data-reveal>
-      <h2 class="section-title">Your transcript, in book form.</h2>
-      <p class="section-sub">Paste it, drop a file, or try a demo. You'll have an EPUB in your reader in a few seconds.</p>
+      <h2 class="section-title">YouTube URL to EPUB.</h2>
+      <p class="section-sub">Paste a video link. If captions are available, you'll have an EPUB in your reader in a few seconds.</p>
     </header>
     <div class="app">
       <form id="preview-form" class="card form" data-reveal>
         <label class="field">
-          <span>Book title</span>
-          <input type="text" name="title" placeholder="e.g. A Short Conversation on Craft" autocomplete="off" />
+          <span>YouTube URL</span>
+          <input type="url" name="source_url" placeholder="https://youtu.be/..." autocomplete="off" inputmode="url" />
         </label>
-        <label class="field">
-          <span>Source link <small>(optional — your show or channel)</small></span>
-          <input type="url" name="source_url" placeholder="https://…" autocomplete="off" />
-        </label>
-        <p class="byline-note">The byline is read from the transcript and always credits the original creators.</p>
+        <p class="byline-note">We use the video's transcript and credit the original creator. Only YouTube links are supported right now.</p>
 
-        <div class="tabs" role="tablist" aria-label="Transcript input method">
-          <button type="button" class="tab active" data-tab="paste" role="tab" aria-selected="true" aria-controls="panel-paste">Paste transcript</button>
-          <button type="button" class="tab" data-tab="upload" role="tab" aria-selected="false" aria-controls="panel-upload">Upload a file</button>
-        </div>
-
-        <div class="tab-panel" data-panel="paste" id="panel-paste" role="tabpanel">
-          <label class="field">
-            <span class="sr-only">Transcript</span>
-            <textarea name="transcript" rows="9" placeholder="Paste your transcript here. Timestamps like **00:00:08** and >> Speaker: markers are handled automatically."></textarea>
-          </label>
-        </div>
-        <div class="tab-panel hidden" data-panel="upload" id="panel-upload" role="tabpanel">
+        <details class="fallback-inputs">
+          <summary>Have a transcript file instead?</summary>
           <label class="field dropzone">
             <input type="file" name="file" accept=".txt,.md,.markdown,.srt,.vtt" />
             <span class="dz-text">Choose a <strong>.txt / .md / .srt / .vtt</strong> file</span>
           </label>
-        </div>
-
-        <p class="demo-row">First time? <button type="button" id="demo-btn" class="demo-link">Try a demo transcript →</button></p>
+          <label class="field compact-field">
+            <span>Book title <small>(optional)</small></span>
+            <input type="text" name="title" placeholder="e.g. A Short Conversation on Craft" autocomplete="off" />
+          </label>
+        </details>
 
         <label class="checkbox">
           <input type="checkbox" name="owns" required />
           <span>I own or have the rights to this content, and I agree to the <a href="/terms" target="_blank" rel="noopener">Terms &amp; Acceptable Use</a>.</span>
         </label>
 
-        <button type="submit" class="btn btn-primary btn-block">Generate free preview</button>
+        <button type="submit" class="btn btn-primary btn-block">Generate EPUB</button>
         <p class="form-error" id="preview-error" role="alert" hidden></p>
       </form>
 
@@ -252,11 +240,11 @@
       <div id="result" class="card result hidden">
         <div class="result-head">
           <div>
-            <span class="result-tag">Free preview ready</span>
+            <span class="result-tag">EPUB ready</span>
             <h3 id="result-title">Your book</h3>
             <p id="result-meta" class="result-meta"></p>
           </div>
-          <a id="download-preview" class="btn btn-ghost" download>Download preview EPUB</a>
+          <a id="download-preview" class="btn btn-ghost" download>Download EPUB</a>
         </div>
         <p class="watermark-note">The preview carries a small "Made with TalkToBook" colophon and a plain cover. Unlock below to drop both.</p>
 
@@ -316,13 +304,13 @@
     <ol class="steps">
       <li data-reveal>
         <span class="step-num">1</span>
-        <h3>Paste or upload</h3>
-        <p>Drop in a transcript — <code>.txt</code>, <code>.md</code>, <code>.srt</code>, or <code>.vtt</code>. Timestamps and filler get cleaned automatically.</p>
+        <h3>Paste a URL</h3>
+        <p>Use a YouTube video with captions, or upload a transcript file: <code>.txt</code>, <code>.md</code>, <code>.srt</code>, or <code>.vtt</code>.</p>
       </li>
       <li data-reveal>
         <span class="step-num">2</span>
-        <h3>Read the preview</h3>
-        <p>We build a real EPUB — designed pages, a cover, the lot. No card needed.</p>
+        <h3>Download the EPUB</h3>
+        <p>We fetch the transcript, clean the text, and build a real EPUB with designed pages and a cover. No card needed.</p>
       </li>
       <li data-reveal>
         <span class="step-num">3</span>

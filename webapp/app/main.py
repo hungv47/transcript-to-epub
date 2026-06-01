@@ -1,12 +1,14 @@
 """TalkToBook — FastAPI service wrapping the transcript-to-epub engine.
 
-Flow: paste/upload a transcript → free preview EPUB (watermarked, plain cover)
-→ $9 unlock → clean, branded EPUB + PDF + Kindle. No accounts; jobs live on disk
-keyed by an unguessable id, paid files gated behind a separate download token.
+Flow: YouTube URL or transcript upload → free EPUB preview (watermarked, plain
+cover) → $9 unlock → clean, branded EPUB + PDF + Kindle. No accounts; jobs live
+on disk keyed by an unguessable id, paid files gated behind a separate download
+token.
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import re
@@ -145,12 +147,13 @@ def _job_public(job: storage.Job) -> dict:
     return out
 
 
-def fulfill(job: storage.Job) -> None:
+async def fulfill(job: storage.Job) -> None:
     """Build the paid edition and gate it behind a fresh download token."""
     if job.paid and job.paid_outputs:
         return
     cover_path = next(iter(job.dir.glob("uploaded_cover.*")), None)
-    result = engine.generate(
+    result = await asyncio.to_thread(
+        engine.generate,
         job.paid_dir,
         raw_text=job.raw_text,
         fmt=job.fmt,
@@ -269,6 +272,8 @@ async def create_preview(
         raise HTTPException(400, "You must confirm you own or have rights to this content.")
 
     raw_text = transcript or ""
+    source_url = (source_url or "").strip()
+    author_hint = None
     filename = None
     if file is not None and file.filename:
         filename = file.filename
@@ -279,26 +284,38 @@ async def create_preview(
         if len(data) > config.MAX_UPLOAD_BYTES:
             raise HTTPException(400, "File too large.")
         raw_text = data.decode("utf-8", errors="replace")
+    elif source_url:
+        if not engine.is_youtube_source(source_url):
+            raise HTTPException(400, "Only YouTube URLs are supported right now. Upload a transcript file for other sources.")
+        try:
+            fetched = await asyncio.to_thread(engine.fetch_youtube_source, source_url)
+        except engine.TranscriptFetchError as e:
+            raise HTTPException(400, str(e))
+        raw_text = fetched["raw_text"]
+        title = title or fetched["title"]
+        author_hint = fetched["author"]
+        source_url = fetched["source_url"]
 
     raw_text = raw_text.strip()
     if not raw_text:
-        raise HTTPException(400, "Paste a transcript or upload a file.")
+        raise HTTPException(400, "Enter a YouTube URL or upload a transcript file.")
     if len(raw_text) > config.MAX_TRANSCRIPT_CHARS:
         raise HTTPException(400, "Transcript is too long for the preview.")
 
     fmt = detect_format(raw_text, filename)
     # Author is auto-detected from the transcript and not user-editable — the
     # original creators are always credited (falling back to a generic credit).
-    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, None)
+    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, author_hint)
     author_d = author_d or engine.UNKNOWN_CREATORS
 
     job = storage.new_job(
         title=title_d, author=author_d,
-        source_url=(source_url or "").strip() or None,
+        source_url=source_url or None,
         fmt=fmt, raw_text=raw_text,
     )
     try:
-        result = engine.generate(
+        result = await asyncio.to_thread(
+            engine.generate,
             job.preview_dir, raw_text=raw_text, fmt=fmt,
             title=title_d, author=author_d,
             source_url=job.source_url, paid=False,
@@ -353,7 +370,7 @@ async def unlock(
 
     # Dev escape hatch: fulfill without paying.
     if config.ALLOW_FREE_UNLOCK and not config.stripe_enabled():
-        fulfill(job)
+        await fulfill(job)
         return _job_public(job)
 
     result = payments.create_checkout(job, job.email or "")
@@ -386,7 +403,7 @@ async def stripe_webhook(request: Request):
         if job and payments.webhook_session_ok(session):
             job.stripe_session_id = session.get("id")
             job.email = job.email or (session.get("customer_details") or {}).get("email")
-            fulfill(job)
+            await fulfill(job)
     return JSONResponse({"received": True})
 
 
@@ -399,7 +416,7 @@ async def job_status(job_id: str, session_id: str | None = None):
     # The session must belong to THIS job (metadata binding), so a paid session
     # for one job can't be replayed to unlock another.
     if not job.paid and session_id and payments.session_job_id(session_id) == job.id:
-        fulfill(job)
+        await fulfill(job)
     return _job_public(job)
 
 
