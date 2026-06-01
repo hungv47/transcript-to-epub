@@ -13,6 +13,10 @@ function money(cents, currency) {
 async function loadConfig() {
   try {
     CONFIG = await (await fetch("/api/config")).json();
+    // Set the CTA mode first: in waitlist mode this replaces the whole button
+    // label (incl. the price span), so the price loop below cleanly skips the
+    // now-absent #unlock-price node instead of formatting then clobbering it.
+    applyPaymentMode();
     const p = money(CONFIG.price_cents, CONFIG.currency);
     ["price", "unlock-price", "plan-price"].forEach((id) => {
       const el = document.getElementById(id);
@@ -28,7 +32,6 @@ async function loadConfig() {
         err.hidden = false;
       }
     }
-    applyPaymentMode();
   } catch (_) { /* defaults are fine */ }
 }
 
@@ -76,7 +79,7 @@ $("#preview-form").addEventListener("submit", async (e) => {
     CURRENT_JOB = data;
     renderResult(data);
   } catch (ex) {
-    err.textContent = ex.message || "Something went wrong. Try again, or email hello@talktobook.example if it keeps happening.";
+    err.textContent = ex.message || `Something went wrong. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"} if it keeps happening.`;
     err.hidden = false;
   } finally {
     btn.disabled = false;
@@ -126,7 +129,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
     msg.textContent = data.message || "Thanks. We saved your interest.";
     msg.hidden = false;
   } catch (ex) {
-    msg.textContent = ex.message || "Couldn't unlock. Try again, or email hello@talktobook.example.";
+    msg.textContent = ex.message || `Couldn't unlock. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"}.`;
     msg.classList.add("err");
     msg.hidden = false;
   } finally {
@@ -166,5 +169,6 @@ async function restoreCanceledJob() {
   } catch (_) { /* leave the page as-is */ }
 }
 
-loadConfig();
-restoreCanceledJob();
+// loadConfig never rejects (it catches internally), so restore always runs —
+// after config resolves, so the unlock CTA label is settled deterministically.
+loadConfig().then(restoreCanceledJob);
