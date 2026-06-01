@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#F7F0E5" />
   <meta name="robots" content="noindex" />
-  <title>Your book is ready — TalkToBook</title>
-  <meta name="description" content="Your TalkToBook download is being prepared. EPUB, PDF, and Kindle formats." />
+  <title>Your creator plan is active - TalkToBook</title>
+  <meta name="description" content="Your TalkToBook creator plan is active and your clean edition is being prepared." />
   <link rel="canonical" href="https://talktobook.com/success" />
 
-  <meta property="og:title" content="Your book is ready — TalkToBook" />
-  <meta property="og:description" content="Your TalkToBook download is being prepared." />
+  <meta property="og:title" content="Your creator plan is active - TalkToBook" />
+  <meta property="og:description" content="Your TalkToBook clean edition is being prepared." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://talktobook.com/success" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -31,13 +31,13 @@
   <main id="main" class="section section--app">
     <div class="app">
       <article class="card result" aria-live="polite">
-        <span class="result-tag">Payment received</span>
+        <span class="result-tag">Creator plan active</span>
         <h1 id="title" class="section-title" style="font-size:2.3rem;margin:.4em 0 .2em;">Building your edition…</h1>
         <p id="status" class="result-meta">Dropping the watermark and rendering EPUB, PDF, and Kindle. A few seconds.</p>
         <div id="downloads" class="upsell" hidden>
           <h4>Your downloads</h4>
           <p id="download-links" style="font-size:1.05rem;line-height:2.2;"></p>
-          <p class="watermark-note">Bookmark this page — your link works for this book.</p>
+          <p class="watermark-note">Your plan includes unlimited clean editions while active.</p>
         </div>
         <p id="error" class="form-error" role="alert" hidden></p>
       </article>
@@ -47,18 +47,18 @@
   <script>
     const params = new URLSearchParams(location.search);
     const jobId = params.get("job");
-    const sessionId = params.get("session_id");
+    const checkoutId = params.get("checkout_id") || params.get("session_id");
     const KINDS = { epub: "EPUB", pdf: "PDF", azw3: "Kindle (AZW3)" };
 
     async function poll(tries = 0) {
       if (!jobId) { fail("Missing job reference."); return; }
       try {
-        const url = `/api/job/${jobId}` + (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "");
+        const url = `/api/job/${jobId}` + (checkoutId ? `?checkout_id=${encodeURIComponent(checkoutId)}` : "");
         const job = await (await fetch(url)).json();
         document.getElementById("title").textContent = job.title || "Your book";
         if (job.paid && job.downloads) { show(job); return; }
       } catch (_) {}
-      if (tries > 30) { fail("Still processing — refresh in a moment, or check the email we sent."); return; }
+      if (tries > 30) { fail("Still processing. Refresh in a moment, or check the email we sent."); return; }
       setTimeout(() => poll(tries + 1), 2000);
     }
     function esc(s) {

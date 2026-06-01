@@ -1,7 +1,7 @@
 // TalkToBook front-end. Plain JS — no build step.
 const $ = (sel, root = document) => root.querySelector(sel);
 
-let CONFIG = { price_cents: 700, currency: "usd", stripe_enabled: false };
+let CONFIG = { price_cents: 700, currency: "usd", payments_enabled: false };
 let CURRENT_JOB = null;
 
 function money(cents, currency) {
@@ -106,7 +106,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.detail || "Unlock failed.");
 
     if (data.checkout_url) {
-      window.location.href = data.checkout_url; // Stripe Checkout
+      window.location.href = data.checkout_url; // Polar Checkout
       return;
     }
     if (data.paid && data.downloads) {
@@ -114,7 +114,7 @@ $("#unlock-form").addEventListener("submit", async (e) => {
       return;
     }
     // Intent-capture mode (payments not wired yet).
-    msg.textContent = data.message || "Thanks — we saved your interest.";
+    msg.textContent = data.message || "Thanks. We saved your interest.";
     msg.hidden = false;
   } catch (ex) {
     msg.textContent = ex.message || "Couldn't unlock. Try again, or email hello@talktobook.example.";

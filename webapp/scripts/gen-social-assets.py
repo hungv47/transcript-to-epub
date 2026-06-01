@@ -61,17 +61,17 @@ def build_og() -> None:
     draw.line((792, 374, 1008, 374), fill=RULE, width=2)
 
     f_word = _font(38, "bold")
-    f_title = _font(90, "bold")
+    f_title = _font(82, "bold")
     f_sub = _font(34, "regular")
     f_meta = _font(22, "regular")
     f_card = _font(30, "bold")
 
     draw.text((80, 126), "TalkToBook", font=f_word, fill=INK, anchor="lt")
-    draw.text((80, 220), "Make a book", font=f_title, fill=INK, anchor="lt")
-    draw.text((80, 324), "from the talk.", font=f_title, fill=ACCENT, anchor="lt")
-    draw.text((80, 456), "Paste a YouTube URL you own.", font=f_sub, fill=MUTED, anchor="lt")
-    draw.text((80, 504), "Get a clean EPUB.", font=f_sub, fill=MUTED, anchor="lt")
-    draw.text((80, 538), "Free preview. $7 creator edition. talktobook.com", font=f_meta, fill=MUTED, anchor="lt")
+    draw.text((80, 206), "Turn a URL into", font=f_title, fill=INK, anchor="lt")
+    draw.text((80, 304), "a lead magnet", font=f_title, fill=ACCENT, anchor="lt")
+    draw.text((80, 402), "EPUB.", font=f_title, fill=ACCENT, anchor="lt")
+    draw.text((80, 502), "For talks, webinars, and lessons you own.", font=f_sub, fill=MUTED, anchor="lt")
+    draw.text((80, 550), "Free preview. $7 clean edition. talktobook.com", font=f_meta, fill=MUTED, anchor="lt")
     draw.text((792, 184), "Lead magnet", font=f_card, fill=INK, anchor="lt")
     draw.text((792, 422), "Course companion", font=f_card, fill=INK, anchor="lt")
 

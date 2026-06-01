@@ -233,8 +233,7 @@ def normalize_input(text: str, fmt: str) -> str:
 
 WATERMARK = (
     "\n\n----\n\n"
-    "*Made with **TalkToBook** — turn your podcast, talk, or interview into a "
-    "Kindle-ready book.*\n"
+    "*Made with **TalkToBook**. Turn one recorded idea into a lead magnet EPUB.*\n"
 )
 
 
