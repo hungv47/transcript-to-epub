@@ -77,14 +77,11 @@ def _accent(raw: str | None) -> str:
     return raw if HEX_RE.match(raw) else engine.BRAND_ACCENT
 
 
-def _preview_url(job: storage.Job, kind: str) -> str:
+def _download_url(job: storage.Job, kind: str, token: str) -> str:
+    """Build a download URL for a file kind. token="preview" serves the free
+    EPUB; the job's download_token serves the gated paid files."""
     name = DOWNLOAD_NAMES[kind][0]
-    return f"/d/{job.id}/preview/{name}"
-
-
-def _paid_url(job: storage.Job, kind: str) -> str:
-    name = DOWNLOAD_NAMES[kind][0]
-    return f"/d/{job.id}/{job.download_token}/{name}"
+    return f"/d/{job.id}/{token}/{name}"
 
 
 def _job_public(job: storage.Job) -> dict:
@@ -95,10 +92,10 @@ def _job_public(job: storage.Job) -> dict:
         "word_count": job.word_count,
         "paid": job.paid,
         "cover_prompt": job.cover_prompt,
-        "preview": {k: _preview_url(job, k) for k in job.preview_outputs},
+        "preview": {k: _download_url(job, k, "preview") for k in job.preview_outputs},
     }
     if job.paid and job.download_token:
-        out["downloads"] = {k: _paid_url(job, k) for k in job.paid_outputs}
+        out["downloads"] = {k: _download_url(job, k, job.download_token) for k in job.paid_outputs}
     return out
 
 

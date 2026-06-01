@@ -34,7 +34,6 @@ import build as t2e  # noqa: E402  (clean_transcript, detect_speakers, etc.)
 
 BRAND_ACCENT = "#B7FF6E"
 BRAND_INK = "#0C1211"
-UNLOCK_PRICE_USD = 9
 # Credit is never silently dropped: when no creator can be detected, the byline
 # degrades to this rather than vanishing. The author is never user-editable —
 # this product credits the original creators of the content.
@@ -272,7 +271,7 @@ def derive_metadata(raw_text: str, fmt: str, title: str | None,
     if not (author or "").strip():
         detected = t2e.detect_speakers(text)
         author = None if detected == "Various Speakers" else detected
-    return title, (author or None) and author.strip()
+    return title, ((author or "").strip() or None)
 
 
 def generate(
