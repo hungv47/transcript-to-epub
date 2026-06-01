@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config, engine, payments, samples, storage
@@ -139,6 +139,26 @@ async def success():
 @app.get("/terms")
 async def terms():
     return FileResponse(STATIC_DIR / "terms.html")
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots() -> PlainTextResponse:
+    """Served from PUBLIC_URL so the Sitemap directive points at the live host."""
+    origin = (config.PUBLIC_URL or "").rstrip("/")
+    body = (STATIC_DIR / "robots.txt").read_text(encoding="utf-8")
+    if origin and "Sitemap:" in body:
+        body = body.replace("https://talktobook.com", origin)
+    return PlainTextResponse(body, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap() -> Response:
+    """Served from PUBLIC_URL so every <loc> is the live origin, not localhost."""
+    origin = (config.PUBLIC_URL or "").rstrip("/")
+    body = (STATIC_DIR / "sitemap.xml").read_text(encoding="utf-8")
+    if origin:
+        body = body.replace("https://talktobook.com", origin)
+    return Response(content=body, media_type="application/xml")
 
 
 @app.get("/healthz")

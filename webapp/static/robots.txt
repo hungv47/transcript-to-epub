@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /d/
+
+Sitemap: https://talktobook.com/sitemap.xml
