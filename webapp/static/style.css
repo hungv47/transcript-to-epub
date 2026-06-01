@@ -123,6 +123,7 @@ input[type=color] { padding: 4px; height: 44px; cursor: pointer; }
 .dropzone input[type=file] { border: none; background: transparent; padding: 0; }
 .dz-text { display: block; color: var(--muted); margin-bottom: 10px; }
 
+.byline-note { font-size: 0.85rem; color: var(--muted); margin: -4px 0 16px; }
 .checkbox { display: flex; align-items: flex-start; gap: 10px; font-size: 0.95rem; margin: 8px 0 20px; cursor: pointer; }
 .checkbox input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--lime-deep); }
 .form-error { color: #b00020; font-size: 0.9rem; margin: 14px 0 0; }

@@ -143,7 +143,6 @@ async def public_config():
 @app.post("/api/preview")
 async def create_preview(
     title: str = Form(""),
-    author: str = Form(""),
     source_url: str = Form(""),
     owns: str = Form(""),
     transcript: str = Form(""),
@@ -171,7 +170,10 @@ async def create_preview(
         raise HTTPException(400, "Transcript is too long for the preview.")
 
     fmt = detect_format(raw_text, filename)
-    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, author)
+    # Author is auto-detected from the transcript and not user-editable — the
+    # original creators are always credited (falling back to a generic credit).
+    title_d, author_d = engine.derive_metadata(raw_text, fmt, title, None)
+    author_d = author_d or engine.UNKNOWN_CREATORS
 
     job = storage.new_job(
         title=title_d, author=author_d,
