@@ -25,6 +25,52 @@ app = FastAPI(title=f"{config.APP_NAME} API")
 STATIC_DIR = config.BASE_DIR / "static"
 config.JOBS_DIR.mkdir(parents=True, exist_ok=True)
 
+
+# ---------------------------------------------------------------------------
+# Security headers
+# ---------------------------------------------------------------------------
+# Chrome's "insecure file" warning on .epub downloads and most browser
+# hardening checks (HSTS preload, mixed-content detection) key off these
+# response headers. Sending them on every response is cheap and removes a
+# whole class of "why is the site warning me" reports.
+#   - HSTS is only set when the request is actually served over HTTPS (or
+#     arrived via a proxy that says so), so dev on http://localhost works.
+#   - Cross-Origin-Resource-Policy: same-origin is what stops another site
+#     from embedding our download URLs in an <a download>.
+
+_DOWNLOAD_HARDENING = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+}
+
+
+def _is_https(request: Request) -> bool:
+    if request.url.scheme == "https":
+        return True
+    return request.headers.get("x-forwarded-proto", "").lower() == "https"
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in _DOWNLOAD_HARDENING.items():
+        response.headers.setdefault(k, v)
+    if _is_https(request):
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        )
+        response.headers.setdefault("Content-Security-Policy", "upgrade-insecure-requests")
+    if "server" in response.headers:
+        del response.headers["server"]
+    # Uvicorn re-adds `server: uvicorn` after middleware runs, so set a custom
+    # value here so the framework doesn't leak through.
+    response.headers["server"] = "TalkToBook"
+    return response
+
 HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 DOWNLOAD_NAMES = {
     "epub": ("book.epub", "application/epub+zip"),
@@ -381,7 +427,19 @@ async def download(job_id: str, token: str, name: str):
         raise HTTPException(404, "Not found.")
     media = next((m for n, m in DOWNLOAD_NAMES.values() if n == name), "application/octet-stream")
     safe_title = re.sub(r"[^\w\- ]", "", job.title)[:60].strip() or "book"
-    return FileResponse(path, media_type=media, filename=f"{safe_title}{Path(name).suffix}")
+    return FileResponse(
+        path,
+        media_type=media,
+        filename=f"{safe_title}{Path(name).suffix}",
+        headers={
+            # Stop third-party sites from embedding our download URLs in their
+            # own pages. Also makes Chrome's "insecure file" heuristic happier
+            # because the file is explicitly same-origin-gated.
+            "Cross-Origin-Resource-Policy": "same-origin",
+            "Content-Description": "File Transfer",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 # Mount static assets last so it doesn't shadow API routes.
