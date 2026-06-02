@@ -65,6 +65,8 @@
             </div>
             <dl class="plan-rows" id="plan-rows"></dl>
             <p class="dash-foot muted-block" id="plan-foot"></p>
+            <button type="button" class="btn btn-ghost btn-sm dash-billing-btn" id="manage-billing-btn" hidden>Manage billing</button>
+            <p class="plan-err" id="billing-err" role="status" hidden></p>
           </section>
 
           <section class="dash-panel dash-panel--stat" data-reveal aria-labelledby="books-h">
@@ -142,6 +144,11 @@
       } else {
         foot.textContent = "Manage or cancel anytime — access continues to the end of the paid period.";
       }
+
+      // The billing portal only exists for a real Polar customer; show it when
+      // there's a live (or winding-down) subscription to manage.
+      const billBtn = $("manage-billing-btn");
+      if (billBtn) billBtn.hidden = !(plan.active || plan.cancel_at_period_end);
     }
 
     function renderBooks(books) {
@@ -221,6 +228,26 @@
     $("logout-btn").addEventListener("click", async () => {
       try { await fetch("/api/logout", { method: "POST" }); } catch (_) {}
       location.href = "/";
+    });
+
+    $("manage-billing-btn").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const err = $("billing-err");
+      err.hidden = true;
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Opening…";
+      try {
+        const res = await fetch("/api/portal", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.url) throw new Error(data.detail || "Couldn't open the billing portal.");
+        location.href = data.url;
+      } catch (ex) {
+        err.textContent = ex.message || "Couldn't open the billing portal. Try again shortly.";
+        err.hidden = false;
+        btn.disabled = false;
+        btn.textContent = label;
+      }
     });
 
     load();

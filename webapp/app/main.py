@@ -544,6 +544,30 @@ async def me(request: Request):
     }
 
 
+@app.post("/api/portal")
+async def billing_portal(request: Request):
+    """Hand a signed-in buyer to Polar's hosted customer portal to manage or
+    cancel their subscription. We resolve their Polar customer id from the
+    subscriber record (falling back to the live subscription), mint a portal
+    session, and return its URL for the client to navigate to."""
+    email = session.read(request.cookies.get(session.COOKIE_NAME))
+    if not email:
+        raise HTTPException(401, "Not signed in.")
+    rec = storage.subscriber_record(email)
+    customer_id = rec.get("customer_id")
+    if not customer_id and rec.get("subscription_id"):
+        sub = payments.get_subscription(rec["subscription_id"]) or {}
+        customer_id = sub.get("customer_id")
+        if customer_id:
+            storage.mark_subscriber_active(email, customer_id=customer_id)
+    if not customer_id:
+        raise HTTPException(409, "No billing account is linked to this email yet.")
+    url = payments.create_customer_portal_url(customer_id, return_url=f"{config.PUBLIC_URL}/dashboard")
+    if not url:
+        raise HTTPException(502, "Couldn't open the billing portal. Please try again shortly.")
+    return {"url": url}
+
+
 @app.post("/api/logout")
 async def logout():
     resp = JSONResponse({"ok": True})

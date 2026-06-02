@@ -1112,6 +1112,8 @@ input[type=color] {
 .plan-rows dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .dash-foot { margin: 1.1rem 0 0; font-size: .9rem; line-height: 1.55; }
 .dash-foot a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.dash-billing-btn { margin-top: 1rem; }
+.plan-err { margin: .6rem 0 0; color: var(--color-error); font-size: .88rem; }
 
 .dash-panel--stat { display: flex; flex-direction: column; }
 .stat-big {

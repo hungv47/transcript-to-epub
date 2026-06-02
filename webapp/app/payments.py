@@ -178,6 +178,30 @@ def get_subscription(subscription_id: str) -> dict | None:
     return res.json()
 
 
+def create_customer_portal_url(customer_id: str, return_url: str | None = None) -> str | None:
+    """Mint a Polar customer-portal session and return its hosted URL.
+
+    The portal lets a paying customer manage, update, or cancel their own
+    subscription on Polar's side — Polar authenticates them via the session
+    token embedded in the URL. Returns None when payments are off, there's no
+    customer id, or Polar rejects the request. Path mirrors the SDK
+    (`/v1/customer-sessions/`)."""
+    if not config.polar_enabled() or not customer_id:
+        return None
+    payload = _compact({"customer_id": customer_id, "return_url": return_url})
+    try:
+        res = requests.post(
+            f"{config.polar_api_base()}/customer-sessions/",
+            headers=_auth_headers(),
+            json=payload,
+            timeout=15,
+        )
+        res.raise_for_status()
+    except requests.RequestException:
+        return None
+    return res.json().get("customer_portal_url")
+
+
 def checkout_job_id(checkout_id: str) -> str | None:
     """Return the job_id a succeeded Polar checkout belongs to, else None."""
     checkout = get_checkout(checkout_id)
