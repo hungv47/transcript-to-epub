@@ -1,5 +1,7 @@
 .env
 jobs/
+events.jsonl
+.playwright-mcp/
 __pycache__/
 *.pyc
 .venv/

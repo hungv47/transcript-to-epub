@@ -65,6 +65,18 @@ ALLOW_FREE_UNLOCK = os.environ.get("ALLOW_FREE_UNLOCK", "").lower() in ("1", "tr
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "hello@talktobook.example")
 DMCA_EMAIL = os.environ.get("DMCA_EMAIL", "dmca@talktobook.example")
 
+# Post-purchase dashboard session. A signed, http-only cookie carries the
+# verified email — no passwords, no DB. Falls back to the Polar webhook secret
+# (stable + secret) so dashboards survive restarts without extra config; set
+# SESSION_SECRET explicitly in production for isolation from the webhook key.
+SESSION_SECRET = (
+    os.environ.get("SESSION_SECRET", "").strip()
+    or POLAR_WEBHOOK_SECRET
+    or POLAR_ACCESS_TOKEN
+    or "t2b-dev-session-secret-change-me"
+)
+SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "60"))
+
 # Input guardrails.
 MAX_TRANSCRIPT_CHARS = int(os.environ.get("MAX_TRANSCRIPT_CHARS", str(800_000)))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024 * 1024)))

@@ -161,6 +161,23 @@ def get_checkout(checkout_id: str) -> dict | None:
     return checkout
 
 
+def get_subscription(subscription_id: str) -> dict | None:
+    """Fetch a subscription's live state from Polar (status, interval, period
+    end, cancel flag). Returns None when payments are off or the call fails."""
+    if not config.polar_enabled() or not subscription_id:
+        return None
+    try:
+        res = requests.get(
+            f"{config.polar_api_base()}/subscriptions/{subscription_id}",
+            headers=_auth_headers(),
+            timeout=15,
+        )
+        res.raise_for_status()
+    except requests.RequestException:
+        return None
+    return res.json()
+
+
 def checkout_job_id(checkout_id: str) -> str | None:
     """Return the job_id a succeeded Polar checkout belongs to, else None."""
     checkout = get_checkout(checkout_id)
