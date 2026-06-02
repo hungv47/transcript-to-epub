@@ -26,20 +26,47 @@ function replayAnim(el, cls) {
   el.classList.add(cls);
 }
 
+// Roll the price from one amount to the other. Interpolate in cents but snap
+// each frame to a whole dollar so the formatter never shows noisy fractions;
+// easeOutCubic shoots fast then settles for an exciting tally.
+let priceAnimId = 0;
+function countPrice(fromCents, toCents) {
+  cancelAnimationFrame(priceAnimId);
+  const el = document.getElementById("plan-price");
+  if (!el) return;
+  const cur = CONFIG.currency, dur = 420;
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  let start = 0;
+  function frame(ts) {
+    if (!start) start = ts;
+    const t = Math.min(1, (ts - start) / dur);
+    const cents = fromCents + (toCents - fromCents) * ease(t);
+    el.textContent = money(Math.round(cents / 100) * 100, cur);
+    if (t < 1) priceAnimId = requestAnimationFrame(frame);
+    else el.textContent = money(toCents, cur);
+  }
+  priceAnimId = requestAnimationFrame(frame);
+}
+
 function renderPlanPrice(period, animate) {
   const priceEl = document.getElementById("plan-price");
   const periodEl = document.getElementById("plan-period");
-  const yearly = CONFIG.price_annual_cents ? money(CONFIG.price_annual_cents, CONFIG.currency) : null;
-  if (period === "yearly" && yearly) {
-    if (priceEl) priceEl.textContent = yearly;
-    if (periodEl) periodEl.textContent = "/year";
-  } else {
-    if (priceEl) priceEl.textContent = money(CONFIG.price_cents, CONFIG.currency);
-    if (periodEl) periodEl.textContent = "/month";
+  const monthly = CONFIG.price_cents;
+  const annual = CONFIG.price_annual_cents;
+  const yearly = !!annual && period === "yearly";
+  const toCents = yearly ? annual : monthly;
+  if (periodEl) periodEl.textContent = yearly ? "/year" : "/month";
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!animate || reduce || !annual) {
+    cancelAnimationFrame(priceAnimId);
+    if (priceEl) priceEl.textContent = money(toCents, CONFIG.currency);
+    return;
   }
-  if (!animate) return;
-  replayAnim(priceEl ? priceEl.closest(".plan-price") : null, "price-swap");
-  if (period === "yearly" && yearly) {
+  // The toggle is two-state, so the "from" is always the other interval.
+  countPrice(yearly ? monthly : annual, toCents);
+  replayAnim(priceEl ? priceEl.closest(".plan-price") : null, "price-pop");
+  if (yearly) {
     // Draw the eye to the saving exactly when it starts applying.
     replayAnim(document.querySelector('label[for="bill-yearly"] .bill-save'), "is-pulsing");
   }
