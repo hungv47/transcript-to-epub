@@ -200,22 +200,22 @@ async def fulfill(job: storage.Job) -> None:
 
 @app.get("/")
 async def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return _serve_static("index.html", "text/html; charset=utf-8")
 
 
 @app.get("/success")
 async def success():
-    return FileResponse(STATIC_DIR / "success.html")
+    return _serve_static("success.html", "text/html; charset=utf-8")
 
 
 @app.get("/dashboard")
 async def dashboard():
-    return FileResponse(STATIC_DIR / "dashboard.html")
+    return _serve_static("dashboard.html", "text/html; charset=utf-8")
 
 
 @app.get("/terms")
 async def terms():
-    return FileResponse(STATIC_DIR / "terms.html")
+    return _serve_static("terms.html", "text/html; charset=utf-8")
 
 
 @app.get("/robots.txt", include_in_schema=False)
@@ -238,10 +238,12 @@ async def sitemap() -> Response:
     return Response(content=body, media_type="application/xml")
 
 
-# Markdown docs for AI assistants and crawlers (AEO/SEO). Served at the root so
-# URLs stay clean (/llms.txt, /product.md, ...). PUBLIC_URL is substituted so
-# absolute links resolve to the live origin in any environment.
-def _serve_doc(filename: str, media_type: str = "text/markdown; charset=utf-8") -> Response:
+# Serve a static file with the placeholder origin (https://talktobook.com,
+# hardcoded in the files) rewritten to the live PUBLIC_URL, so absolute URLs —
+# canonical, og:url, JSON-LD, sitemap links — resolve to the real host in any
+# environment. Used for the AEO/SEO docs (/llms.txt, /product.md, ...) and the
+# HTML pages, whose <link rel="canonical"> etc. must not point at a dead domain.
+def _serve_static(filename: str, media_type: str = "text/markdown; charset=utf-8") -> Response:
     origin = (config.PUBLIC_URL or "").rstrip("/")
     body = (STATIC_DIR / filename).read_text(encoding="utf-8")
     if origin:
@@ -251,22 +253,22 @@ def _serve_doc(filename: str, media_type: str = "text/markdown; charset=utf-8") 
 
 @app.get("/llms.txt", include_in_schema=False)
 async def llms_txt() -> Response:
-    return _serve_doc("llms.txt", "text/plain; charset=utf-8")
+    return _serve_static("llms.txt", "text/plain; charset=utf-8")
 
 
 @app.get("/product.md", include_in_schema=False)
 async def product_md() -> Response:
-    return _serve_doc("product.md")
+    return _serve_static("product.md")
 
 
 @app.get("/pricing.md", include_in_schema=False)
 async def pricing_md() -> Response:
-    return _serve_doc("pricing.md")
+    return _serve_static("pricing.md")
 
 
 @app.get("/faq.md", include_in_schema=False)
 async def faq_md() -> Response:
-    return _serve_doc("faq.md")
+    return _serve_static("faq.md")
 
 
 @app.get("/healthz")
