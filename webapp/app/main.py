@@ -427,6 +427,26 @@ async def unlock(
     }
 
 
+@app.post("/api/checkout")
+async def plan_checkout(interval: str = Form("monthly"), email: str = Form("")):
+    """Start a Creator Plan checkout straight from the pricing section, with no
+    preview job. The plan is email-linked; generating and unlocking later with
+    the same email fulfills clean editions."""
+    interval = "yearly" if interval == "yearly" else "monthly"
+    _event("plan_checkout_click", interval=interval, email=bool(email), live=config.payments_enabled())
+    try:
+        result = payments.create_plan_checkout(interval, email)
+    except payments.PaymentError as e:
+        raise HTTPException(502, str(e))
+    if result.get("url"):
+        return {"checkout_url": result["url"]}
+    _event("plan_checkout_intent", interval=interval, email=bool(email))
+    return {
+        "intent": True,
+        "message": "Payments are launching shortly. Generate a free preview now, and we'll email your plan link when it goes live.",
+    }
+
+
 def _event_email(data: dict) -> str | None:
     customer = data.get("customer") or {}
     return data.get("customer_email") or data.get("email") or customer.get("email")

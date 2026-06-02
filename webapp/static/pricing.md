@@ -21,7 +21,7 @@ Everything in the free preview, plus:
 ### Price
 
 - Monthly: $7 per month.
-- Yearly: $67 per year, which is about 20% less than paying monthly ($84 per year at the monthly rate).
+- Yearly: $67 per year (about 20% off).
 
 You choose monthly or yearly at checkout.
 

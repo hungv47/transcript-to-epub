@@ -84,6 +84,13 @@ def polar_product_ids() -> list[str]:
     return [p for p in (POLAR_PRODUCT_ID, POLAR_PRODUCT_ID_ANNUAL) if p]
 
 
+def product_for_interval(interval: str) -> str:
+    """Map a billing interval to its product id (annual when available)."""
+    if interval == "yearly" and POLAR_PRODUCT_ID_ANNUAL:
+        return POLAR_PRODUCT_ID_ANNUAL
+    return POLAR_PRODUCT_ID
+
+
 def polar_enabled() -> bool:
     return bool(POLAR_ACCESS_TOKEN and POLAR_PRODUCT_ID)
 

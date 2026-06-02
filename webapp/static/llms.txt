@@ -15,7 +15,7 @@ TalkToBook is a tool, not a content library. You convert content you own or have
 
 - Input: a YouTube URL with captions, or a `.txt`, `.md`, `.srt`, or `.vtt` transcript file.
 - Output: EPUB for the free preview; EPUB, PDF, and Kindle (AZW3) on the Creator Plan.
-- Pricing: free EPUB preview; Creator Plan at $7/month or $67/year (about 20% off paying monthly).
+- Pricing: free EPUB preview; Creator Plan at $7/month or $67/year (about 20% off).
 - Use cases: lead magnets, course companions, webinar follow-ups, newsletter bonuses, and back-catalog repurposing.
 - Rights: you must own or have the rights to anything you upload.
 - Website: https://talktobook.com/

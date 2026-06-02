@@ -42,6 +42,24 @@ def normalized_email(email: str) -> str:
     return parsed
 
 
+def _post_checkout(payload: dict) -> dict:
+    """POST a checkout payload to Polar and return {"url", "checkout_id"}."""
+    try:
+        res = requests.post(
+            f"{config.polar_api_base()}/checkouts",
+            headers=_auth_headers(),
+            json=payload,
+            timeout=15,
+        )
+        res.raise_for_status()
+    except requests.RequestException as exc:
+        raise PaymentError("Polar checkout is unavailable.") from exc
+    checkout = res.json()
+    if not checkout.get("url") or not checkout.get("id"):
+        raise PaymentError("Polar returned an incomplete checkout session.")
+    return {"url": checkout["url"], "checkout_id": checkout["id"]}
+
+
 def create_checkout(job, email: str) -> dict:
     """Create a Polar Checkout session, or signal intent-capture mode.
 
@@ -65,21 +83,33 @@ def create_checkout(job, email: str) -> dict:
         "return_url": f"{config.PUBLIC_URL}/?canceled={job.id}",
         "currency": config.CURRENCY.lower(),
     })
-    try:
-        res = requests.post(
-            f"{config.polar_api_base()}/checkouts",
-            headers=_auth_headers(),
-            json=payload,
-            timeout=15,
-        )
-        res.raise_for_status()
-    except requests.RequestException as exc:
-        raise PaymentError("Polar checkout is unavailable.") from exc
+    return _post_checkout(payload)
 
-    checkout = res.json()
-    if not checkout.get("url") or not checkout.get("id"):
-        raise PaymentError("Polar returned an incomplete checkout session.")
-    return {"url": checkout["url"], "checkout_id": checkout["id"]}
+
+def create_plan_checkout(interval: str, email: str = "") -> dict:
+    """Create a Polar Checkout for the Creator Plan directly from pricing, with
+    no preview job. The plan is email-linked: once active, generating and
+    unlocking with the same email fulfills clean editions.
+
+    Returns ``{"url", "checkout_id"}`` or ``{"intent": True}`` when Polar isn't
+    configured. The selected interval picks a single product so the customer
+    lands straight on that price.
+    """
+    if not config.polar_enabled():
+        return {"intent": True}
+
+    customer_email = normalized_email(email)
+    payload = _compact({
+        "products": [config.product_for_interval(interval)],
+        "customer_email": customer_email or None,
+        "external_customer_id": customer_email or None,
+        "metadata": {"plan_interval": interval, "email": customer_email},
+        "allow_discount_codes": False,
+        "success_url": f"{config.PUBLIC_URL}/success?checkout_id={{CHECKOUT_ID}}",
+        "return_url": f"{config.PUBLIC_URL}/?canceled=plan",
+        "currency": config.CURRENCY.lower(),
+    })
+    return _post_checkout(payload)
 
 
 def verify_webhook(payload: bytes, headers) -> dict | None:

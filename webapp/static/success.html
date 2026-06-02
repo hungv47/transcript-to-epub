@@ -51,7 +51,10 @@
     const KINDS = { epub: "EPUB", pdf: "PDF", azw3: "Kindle (AZW3)" };
 
     async function poll(tries = 0) {
-      if (!jobId) { fail("Missing job reference."); return; }
+      if (!jobId) {
+        if (checkoutId) { showSubscriptionActive(); } else { fail("Missing reference."); }
+        return;
+      }
       try {
         const url = `/api/job/${jobId}` + (checkoutId ? `?checkout_id=${encodeURIComponent(checkoutId)}` : "");
         const job = await (await fetch(url)).json();
@@ -70,6 +73,15 @@
         .map(([k, u]) => `<a class="btn btn-primary" style="margin:4px" href="${esc(u)}" download>${esc(KINDS[k] || k)}</a>`)
         .join(" ");
       document.getElementById("download-links").innerHTML = links;
+      document.getElementById("downloads").hidden = false;
+    }
+    function showSubscriptionActive() {
+      document.getElementById("title").textContent = "Your Creator Plan is active";
+      document.getElementById("status").textContent =
+        "Now generate your first clean edition. Use the same email you just paid with, and your EPUB, PDF, and Kindle unlock automatically.";
+      document.querySelector("#downloads h4").textContent = "Next step";
+      document.getElementById("download-links").innerHTML =
+        '<a class="btn btn-primary" href="/">Generate a book</a>';
       document.getElementById("downloads").hidden = false;
     }
     function fail(msg) {

@@ -22,7 +22,7 @@ The free preview is an EPUB. The Creator Plan adds PDF and Kindle (AZW3) alongsi
 
 ## How much does it cost?
 
-The preview is free. The Creator Plan is $7 per month or $67 per year (about 20% off paying monthly). See [pricing](/pricing.md) for what each tier includes.
+The preview is free. The Creator Plan is $7 per month or $67 per year (about 20% off). See [pricing](/pricing.md) for what each tier includes.
 
 ## Can I cancel?
 

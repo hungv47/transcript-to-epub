@@ -19,22 +19,50 @@ function selectedBilling() {
 function renderPlanPrice(period) {
   const priceEl = document.getElementById("plan-price");
   const periodEl = document.getElementById("plan-period");
-  const metaEl = document.getElementById("plan-meta");
   const yearly = CONFIG.price_annual_cents ? money(CONFIG.price_annual_cents, CONFIG.currency) : null;
   if (period === "yearly" && yearly) {
     if (priceEl) priceEl.textContent = yearly;
     if (periodEl) periodEl.textContent = "/year";
-    if (metaEl) metaEl.textContent = `${money(Math.round(CONFIG.price_annual_cents / 12), CONFIG.currency)}/month, billed yearly`;
   } else {
     if (priceEl) priceEl.textContent = money(CONFIG.price_cents, CONFIG.currency);
     if (periodEl) periodEl.textContent = "/month";
-    if (metaEl) metaEl.textContent = yearly ? `or ${yearly}/year` : "";
   }
 }
 
 document.querySelectorAll('input[name="billing"]').forEach((radio) => {
   radio.addEventListener("change", () => renderPlanPrice(radio.value));
 });
+
+// Pay for the Creator Plan straight from the pricing section: start a Polar
+// checkout for the selected interval, no preview job required.
+const getPlanBtn = document.getElementById("get-plan-btn");
+if (getPlanBtn) {
+  getPlanBtn.addEventListener("click", async () => {
+    const msg = document.getElementById("get-plan-msg");
+    if (msg) { msg.hidden = true; msg.classList.remove("err"); }
+    const label = getPlanBtn.textContent;
+    getPlanBtn.disabled = true;
+    getPlanBtn.textContent = "Starting checkout…";
+    try {
+      const fd = new FormData();
+      fd.set("interval", selectedBilling());
+      const res = await fetch("/api/checkout", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Couldn't start checkout.");
+      if (data.checkout_url) { window.location.href = data.checkout_url; return; }
+      if (msg) { msg.textContent = data.message || "Thanks. We saved your interest."; msg.hidden = false; }
+    } catch (ex) {
+      if (msg) {
+        msg.textContent = ex.message || `Couldn't start checkout. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"}.`;
+        msg.classList.add("err");
+        msg.hidden = false;
+      }
+    } finally {
+      getPlanBtn.disabled = false;
+      getPlanBtn.textContent = label;
+    }
+  });
+}
 
 async function loadConfig() {
   try {
@@ -72,6 +100,8 @@ function applyPaymentMode() {
   if (CONFIG.payments_enabled) return;
   const btn = document.getElementById("unlock-btn");
   if (btn) btn.textContent = "Join the creator-plan waitlist";
+  const plan = document.getElementById("get-plan-btn");
+  if (plan) plan.textContent = "Join the creator-plan waitlist";
 }
 
 function esc(s) {
