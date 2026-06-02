@@ -16,6 +16,14 @@ function selectedBilling() {
   return document.querySelector('input[name="billing"]:checked')?.value || "monthly";
 }
 
+// Offer yearly when there's an annual product to bill, OR when payments are off
+// entirely (intent-capture) — with no real charge there's no interval mismatch,
+// so the yearly price stays as marketing. Hide it only when payments are LIVE
+// but no annual product exists (that case routes a "Yearly" pick to monthly).
+function yearlyOffered() {
+  return !!CONFIG.annual_enabled || !CONFIG.payments_enabled;
+}
+
 // Replay a CSS animation: drop the class, force a reflow so the browser
 // resets the animation, then re-add it. Reduced-motion users get nothing —
 // the keyframes only exist under prefers-reduced-motion: no-preference.
@@ -53,15 +61,12 @@ function renderPlanPrice(period, animate) {
   const periodEl = document.getElementById("plan-period");
   const monthly = CONFIG.price_cents;
   const annual = CONFIG.price_annual_cents;
-  // Offer yearly only when an annual *product* exists; price_annual_cents is a
-  // display default and is always truthy, so gating on it would route a
-  // "Yearly" pick to the monthly product in a monthly-only deployment.
-  const yearly = !!CONFIG.annual_enabled && period === "yearly";
+  const yearly = yearlyOffered() && period === "yearly";
   const toCents = yearly ? annual : monthly;
   if (periodEl) periodEl.textContent = yearly ? "/year" : "/month";
 
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!animate || reduce || !CONFIG.annual_enabled) {
+  if (!animate || reduce || !yearlyOffered()) {
     cancelAnimationFrame(priceAnimId);
     if (priceEl) priceEl.textContent = money(toCents, CONFIG.currency);
     return;
@@ -126,9 +131,9 @@ async function loadConfig() {
       const ann = document.getElementById("price-annual");
       if (ann) ann.textContent = money(CONFIG.price_annual_cents, CONFIG.currency);
     }
-    // No annual product → hide the billing toggle so "Yearly" can't be picked
-    // (it would route to the monthly product). Force the monthly view.
-    if (!CONFIG.annual_enabled) {
+    // Yearly not offered (payments live but no annual product) → hide the
+    // toggle + upsell so "Yearly" can't be picked and routed to monthly.
+    if (!yearlyOffered()) {
       const wrap = document.querySelector(".bill-toggle-wrap");
       if (wrap) wrap.hidden = true;
       const upsell = document.querySelector(".upsell-annual");
