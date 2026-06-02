@@ -1,0 +1,21 @@
+# TalkToBook
+
+> TalkToBook turns a YouTube URL (or an uploaded transcript) into a clean, designed EPUB you can hand to your audience. It is built for creators repurposing their own talks, webinars, courses, and podcast episodes into lead magnets and downloadable books.
+
+TalkToBook is a tool, not a content library. You convert content you own or have the rights to, and you confirm that before each build. The free preview is a watermarked EPUB; the paid Creator Plan adds PDF and Kindle (AZW3), removes the colophon, and lets you set your own cover and accent color. Spoken prose stays spoken prose: the engine cleans timestamps and merges fragments into paragraphs, it does not rewrite your ideas.
+
+## Docs
+
+- [Product overview](/product.md): what TalkToBook does, who it is for, how it works, and the output formats.
+- [Pricing](/pricing.md): the free preview and the $7/month or $67/year Creator Plan, with what each tier includes.
+- [FAQ](/faq.md): common questions about reading quality, content rights, formats, and audio-only sources.
+- [Terms and acceptable use](/terms): ownership rules and the copyright/DMCA process.
+
+## Key facts
+
+- Input: a YouTube URL with captions, or a `.txt`, `.md`, `.srt`, or `.vtt` transcript file.
+- Output: EPUB for the free preview; EPUB, PDF, and Kindle (AZW3) on the Creator Plan.
+- Pricing: free EPUB preview; Creator Plan at $7/month or $67/year (about 20% off paying monthly).
+- Use cases: lead magnets, course companions, webinar follow-ups, newsletter bonuses, and back-catalog repurposing.
+- Rights: you must own or have the rights to anything you upload.
+- Website: https://talktobook.com/

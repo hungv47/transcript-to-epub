@@ -22,6 +22,13 @@ async function loadConfig() {
       const el = document.getElementById(id);
       if (el) el.textContent = p;
     });
+    if (CONFIG.price_annual_cents) {
+      const pa = money(CONFIG.price_annual_cents, CONFIG.currency);
+      ["plan-price-annual", "price-annual"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = pa;
+      });
+    }
     if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {
       const form = document.getElementById("preview-form");
       const err = document.getElementById("preview-error");

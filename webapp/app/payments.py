@@ -53,7 +53,7 @@ def create_checkout(job, email: str) -> dict:
 
     customer_email = normalized_email(email)
     payload = _compact({
-        "products": [config.POLAR_PRODUCT_ID],
+        "products": config.polar_product_ids(),
         "customer_email": customer_email or None,
         "external_customer_id": customer_email or None,
         "metadata": {
@@ -108,7 +108,7 @@ def verify_webhook(payload: bytes, headers) -> dict | None:
 def _checkout_valid(checkout: dict) -> bool:
     return (
         checkout.get("status") == "succeeded"
-        and checkout.get("product_id") == config.POLAR_PRODUCT_ID
+        and checkout.get("product_id") in config.polar_product_ids()
         and (checkout.get("currency") or "").lower() == config.CURRENCY.lower()
     )
 

@@ -35,12 +35,18 @@ PLAN_PRICE_CENTS = int(
     os.environ.get("PLAN_PRICE_CENTS", os.environ.get("UNLOCK_PRICE_CENTS", "700"))
 )
 UNLOCK_PRICE_CENTS = PLAN_PRICE_CENTS
+# Annual creator plan price (cents). Default $67/yr ≈ 20% off paying monthly.
+PLAN_PRICE_ANNUAL_CENTS = int(os.environ.get("PLAN_PRICE_ANNUAL_CENTS", "6700"))
 CURRENCY = os.environ.get("CURRENCY", "usd")
 
 # Polar — when unset, the app runs in "intent capture" mode (no live payments),
 # which is the PRD's "read demand before payments are wired" path.
 POLAR_ACCESS_TOKEN = os.environ.get("POLAR_ACCESS_TOKEN", "").strip()
+# Monthly product is required to enable payments. Annual is optional; when set,
+# both are offered on one Polar checkout (the customer picks the interval) and
+# either product satisfies checkout/webhook validation.
 POLAR_PRODUCT_ID = os.environ.get("POLAR_PRODUCT_ID", "").strip()
+POLAR_PRODUCT_ID_ANNUAL = os.environ.get("POLAR_PRODUCT_ID_ANNUAL", "").strip()
 POLAR_WEBHOOK_SECRET = os.environ.get("POLAR_WEBHOOK_SECRET", "").strip()
 POLAR_SERVER = os.environ.get("POLAR_SERVER", "production").strip().lower()
 POLAR_API_BASE = os.environ.get("POLAR_API_BASE", "").strip().rstrip("/")
@@ -71,6 +77,11 @@ def polar_api_base() -> str:
     if POLAR_SERVER == "sandbox":
         return "https://sandbox-api.polar.sh/v1"
     return "https://api.polar.sh/v1"
+
+
+def polar_product_ids() -> list[str]:
+    """Configured product IDs (monthly first, then annual if set)."""
+    return [p for p in (POLAR_PRODUCT_ID, POLAR_PRODUCT_ID_ANNUAL) if p]
 
 
 def polar_enabled() -> bool:

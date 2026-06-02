@@ -233,6 +233,37 @@ async def sitemap() -> Response:
     return Response(content=body, media_type="application/xml")
 
 
+# Markdown docs for AI assistants and crawlers (AEO/SEO). Served at the root so
+# URLs stay clean (/llms.txt, /product.md, ...). PUBLIC_URL is substituted so
+# absolute links resolve to the live origin in any environment.
+def _serve_doc(filename: str, media_type: str = "text/markdown; charset=utf-8") -> Response:
+    origin = (config.PUBLIC_URL or "").rstrip("/")
+    body = (STATIC_DIR / filename).read_text(encoding="utf-8")
+    if origin:
+        body = body.replace("https://talktobook.com", origin)
+    return Response(content=body, media_type=media_type)
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt() -> Response:
+    return _serve_doc("llms.txt", "text/plain; charset=utf-8")
+
+
+@app.get("/product.md", include_in_schema=False)
+async def product_md() -> Response:
+    return _serve_doc("product.md")
+
+
+@app.get("/pricing.md", include_in_schema=False)
+async def pricing_md() -> Response:
+    return _serve_doc("pricing.md")
+
+
+@app.get("/faq.md", include_in_schema=False)
+async def faq_md() -> Response:
+    return _serve_doc("faq.md")
+
+
 @app.get("/healthz")
 async def healthz():
     """Liveness/readiness probe for the host platform."""
@@ -244,6 +275,8 @@ async def public_config():
     return {
         "app_name": config.APP_NAME,
         "price_cents": config.UNLOCK_PRICE_CENTS,
+        "price_annual_cents": config.PLAN_PRICE_ANNUAL_CENTS,
+        "annual_enabled": bool(config.POLAR_PRODUCT_ID_ANNUAL),
         "currency": config.CURRENCY,
         "payment_provider": "polar",
         "payments_enabled": config.payments_enabled(),
@@ -401,7 +434,7 @@ def _event_email(data: dict) -> str | None:
 
 async def _activate_subscription_for_job(data: dict) -> None:
     product_id = data.get("product_id") or (data.get("product") or {}).get("id")
-    if product_id and product_id != config.POLAR_PRODUCT_ID:
+    if product_id and product_id not in config.polar_product_ids():
         return
     metadata = data.get("metadata") or {}
     job_id = metadata.get("job_id")
@@ -450,7 +483,7 @@ async def polar_webhook(request: Request):
         email = data.get("email")
         active = [
             s for s in data.get("active_subscriptions", [])
-            if s.get("product_id") == config.POLAR_PRODUCT_ID
+            if s.get("product_id") in config.polar_product_ids()
         ]
         if active:
             s = active[0]
