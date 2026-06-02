@@ -74,10 +74,10 @@ def create_checkout(job, email: str) -> dict:
         "products": config.polar_product_ids(),
         "customer_email": customer_email or None,
         "external_customer_id": customer_email or None,
-        "metadata": {
+        "metadata": _compact({
             "job_id": job.id,
             "email": customer_email,
-        },
+        }),
         "allow_discount_codes": False,
         "success_url": f"{config.PUBLIC_URL}/success?job={job.id}&checkout_id={{CHECKOUT_ID}}",
         "return_url": f"{config.PUBLIC_URL}/?canceled={job.id}",
@@ -103,7 +103,7 @@ def create_plan_checkout(interval: str, email: str = "") -> dict:
         "products": [config.product_for_interval(interval)],
         "customer_email": customer_email or None,
         "external_customer_id": customer_email or None,
-        "metadata": {"plan_interval": interval, "email": customer_email},
+        "metadata": _compact({"plan_interval": interval, "email": customer_email}),
         "allow_discount_codes": False,
         "success_url": f"{config.PUBLIC_URL}/success?checkout_id={{CHECKOUT_ID}}",
         "return_url": f"{config.PUBLIC_URL}/?canceled=plan",
