@@ -131,6 +131,8 @@ async function loadConfig() {
     if (!CONFIG.annual_enabled) {
       const wrap = document.querySelector(".bill-toggle-wrap");
       if (wrap) wrap.hidden = true;
+      const upsell = document.querySelector(".upsell-annual");
+      if (upsell) upsell.hidden = true;
       const monthlyRadio = document.getElementById("bill-monthly");
       if (monthlyRadio) monthlyRadio.checked = true;
     }
