@@ -788,6 +788,22 @@ input[type=color] {
   color: var(--color-panel);
 }
 
+/* Toggle feedback: the price rises in on every switch; the Save badge pulses
+   once when yearly is chosen. Reduced-motion users get the instant swap. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes price-swap {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bill-save-pulse {
+    0%   { transform: scale(1); }
+    42%  { transform: scale(1.16); }
+    100% { transform: scale(1); }
+  }
+  .plan-price.price-swap { animation: price-swap .32s var(--ease); }
+  .bill-save.is-pulsing { animation: bill-save-pulse .44s var(--ease); }
+}
+
 .pricing {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

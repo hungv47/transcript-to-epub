@@ -16,7 +16,17 @@ function selectedBilling() {
   return document.querySelector('input[name="billing"]:checked')?.value || "monthly";
 }
 
-function renderPlanPrice(period) {
+// Replay a CSS animation: drop the class, force a reflow so the browser
+// resets the animation, then re-add it. Reduced-motion users get nothing —
+// the keyframes only exist under prefers-reduced-motion: no-preference.
+function replayAnim(el, cls) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+function renderPlanPrice(period, animate) {
   const priceEl = document.getElementById("plan-price");
   const periodEl = document.getElementById("plan-period");
   const yearly = CONFIG.price_annual_cents ? money(CONFIG.price_annual_cents, CONFIG.currency) : null;
@@ -27,10 +37,16 @@ function renderPlanPrice(period) {
     if (priceEl) priceEl.textContent = money(CONFIG.price_cents, CONFIG.currency);
     if (periodEl) periodEl.textContent = "/month";
   }
+  if (!animate) return;
+  replayAnim(priceEl ? priceEl.closest(".plan-price") : null, "price-swap");
+  if (period === "yearly" && yearly) {
+    // Draw the eye to the saving exactly when it starts applying.
+    replayAnim(document.querySelector('label[for="bill-yearly"] .bill-save'), "is-pulsing");
+  }
 }
 
 document.querySelectorAll('input[name="billing"]').forEach((radio) => {
-  radio.addEventListener("change", () => renderPlanPrice(radio.value));
+  radio.addEventListener("change", () => renderPlanPrice(radio.value, true));
 });
 
 // Pay for the Creator Plan straight from the pricing section: start a Polar
