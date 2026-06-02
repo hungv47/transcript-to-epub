@@ -70,7 +70,15 @@ def _https_redirect_url(request: Request) -> str:
 
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
-    if config.FORCE_HTTPS and not _is_https(request) and not _is_local_request(request):
+    # Health probes hit /healthz over plain HTTP on the host's internal network
+    # (no x-forwarded-proto), so redirecting them to HTTPS makes the platform
+    # healthcheck fail and the deploy never goes live. Exempt the health path.
+    if (
+        config.FORCE_HTTPS
+        and request.url.path != "/healthz"
+        and not _is_https(request)
+        and not _is_local_request(request)
+    ):
         return RedirectResponse(_https_redirect_url(request), status_code=308)
     response = await call_next(request)
     for k, v in _DOWNLOAD_HARDENING.items():
