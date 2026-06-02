@@ -531,7 +531,7 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: var(--color-muted);
-  opacity: .82;
+  opacity: 1; /* muted is already lighter than entered ink text; .82 dropped it below 4.5:1 */
 }
 input:focus,
 textarea:focus {
