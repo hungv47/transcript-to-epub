@@ -1,13 +1,118 @@
 // TalkToBook front-end. Plain JS — no build step.
 const $ = (sel, root = document) => root.querySelector(sel);
 
-let CONFIG = { price_cents: 700, currency: "usd", payments_enabled: false };
+let CONFIG = { price_cents: 700, price_annual_cents: 6700, currency: "usd", payments_enabled: false };
 let CURRENT_JOB = null;
 
 function money(cents, currency) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: (currency || "usd").toUpperCase() })
     .format(cents / 100)
     .replace(/\.00$/, "");
+}
+
+// Pricing-section billing toggle. The Polar checkout offers both intervals
+// regardless; this only swaps what the Creator Plan card displays.
+function selectedBilling() {
+  return document.querySelector('input[name="billing"]:checked')?.value || "monthly";
+}
+
+// Offer yearly when there's an annual product to bill, OR when payments are off
+// entirely (intent-capture) — with no real charge there's no interval mismatch,
+// so the yearly price stays as marketing. Hide it only when payments are LIVE
+// but no annual product exists (that case routes a "Yearly" pick to monthly).
+function yearlyOffered() {
+  return !!CONFIG.annual_enabled || !CONFIG.payments_enabled;
+}
+
+// Replay a CSS animation: drop the class, force a reflow so the browser
+// resets the animation, then re-add it. Reduced-motion users get nothing —
+// the keyframes only exist under prefers-reduced-motion: no-preference.
+function replayAnim(el, cls) {
+  if (!el) return;
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+// Roll the price from one amount to the other. Interpolate in cents but snap
+// each frame to a whole dollar so the formatter never shows noisy fractions;
+// easeOutCubic shoots fast then settles for an exciting tally.
+let priceAnimId = 0;
+function countPrice(fromCents, toCents) {
+  cancelAnimationFrame(priceAnimId);
+  const el = document.getElementById("plan-price");
+  if (!el) return;
+  const cur = CONFIG.currency, dur = 420;
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  let start = 0;
+  function frame(ts) {
+    if (!start) start = ts;
+    const t = Math.min(1, (ts - start) / dur);
+    const cents = fromCents + (toCents - fromCents) * ease(t);
+    el.textContent = money(Math.round(cents / 100) * 100, cur);
+    if (t < 1) priceAnimId = requestAnimationFrame(frame);
+    else el.textContent = money(toCents, cur);
+  }
+  priceAnimId = requestAnimationFrame(frame);
+}
+
+function renderPlanPrice(period, animate) {
+  const priceEl = document.getElementById("plan-price");
+  const periodEl = document.getElementById("plan-period");
+  const monthly = CONFIG.price_cents;
+  const annual = CONFIG.price_annual_cents;
+  const yearly = yearlyOffered() && period === "yearly";
+  const toCents = yearly ? annual : monthly;
+  if (periodEl) periodEl.textContent = yearly ? "/year" : "/month";
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!animate || reduce || !yearlyOffered()) {
+    cancelAnimationFrame(priceAnimId);
+    if (priceEl) priceEl.textContent = money(toCents, CONFIG.currency);
+    return;
+  }
+  // The toggle is two-state, so the "from" is always the other interval.
+  countPrice(yearly ? monthly : annual, toCents);
+  replayAnim(priceEl ? priceEl.closest(".plan-price") : null, "price-pop");
+  if (yearly) {
+    // Draw the eye to the saving exactly when it starts applying.
+    replayAnim(document.querySelector('label[for="bill-yearly"] .bill-save'), "is-pulsing");
+  }
+}
+
+document.querySelectorAll('input[name="billing"]').forEach((radio) => {
+  radio.addEventListener("change", () => renderPlanPrice(radio.value, true));
+});
+
+// Pay for the Creator Plan straight from the pricing section: start a Polar
+// checkout for the selected interval, no preview job required.
+const getPlanBtn = document.getElementById("get-plan-btn");
+if (getPlanBtn) {
+  getPlanBtn.addEventListener("click", async () => {
+    const msg = document.getElementById("get-plan-msg");
+    if (msg) { msg.hidden = true; msg.classList.remove("err"); }
+    const label = getPlanBtn.textContent;
+    getPlanBtn.disabled = true;
+    getPlanBtn.textContent = "Starting checkout…";
+    try {
+      const fd = new FormData();
+      fd.set("interval", selectedBilling());
+      const res = await fetch("/api/checkout", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Couldn't start checkout.");
+      if (data.checkout_url) { window.location.href = data.checkout_url; return; }
+      if (msg) { msg.textContent = data.message || "Thanks. We saved your interest."; msg.hidden = false; }
+    } catch (ex) {
+      if (msg) {
+        msg.textContent = ex.message || `Couldn't start checkout. Try again, or email ${CONFIG.contact_email || "hello@talktobook.example"}.`;
+        msg.classList.add("err");
+        msg.hidden = false;
+      }
+    } finally {
+      getPlanBtn.disabled = false;
+      getPlanBtn.textContent = label;
+    }
+  });
 }
 
 async function loadConfig() {
@@ -18,10 +123,25 @@ async function loadConfig() {
     // now-absent #unlock-price node instead of formatting then clobbering it.
     applyPaymentMode();
     const p = money(CONFIG.price_cents, CONFIG.currency);
-    ["price", "unlock-price", "plan-price"].forEach((id) => {
+    ["price", "unlock-price"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = p;
     });
+    if (CONFIG.price_annual_cents) {
+      const ann = document.getElementById("price-annual");
+      if (ann) ann.textContent = money(CONFIG.price_annual_cents, CONFIG.currency);
+    }
+    // Yearly not offered (payments live but no annual product) → hide the
+    // toggle + upsell so "Yearly" can't be picked and routed to monthly.
+    if (!yearlyOffered()) {
+      const wrap = document.querySelector(".bill-toggle-wrap");
+      if (wrap) wrap.hidden = true;
+      const upsell = document.querySelector(".upsell-annual");
+      if (upsell) upsell.hidden = true;
+      const monthlyRadio = document.getElementById("bill-monthly");
+      if (monthlyRadio) monthlyRadio.checked = true;
+    }
+    renderPlanPrice(selectedBilling());
     if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {
       const form = document.getElementById("preview-form");
       const err = document.getElementById("preview-error");
@@ -41,6 +161,8 @@ function applyPaymentMode() {
   if (CONFIG.payments_enabled) return;
   const btn = document.getElementById("unlock-btn");
   if (btn) btn.textContent = "Join the creator-plan waitlist";
+  const plan = document.getElementById("get-plan-btn");
+  if (plan) plan.textContent = "Join the creator-plan waitlist";
 }
 
 function esc(s) {

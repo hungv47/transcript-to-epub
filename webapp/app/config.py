@@ -35,12 +35,18 @@ PLAN_PRICE_CENTS = int(
     os.environ.get("PLAN_PRICE_CENTS", os.environ.get("UNLOCK_PRICE_CENTS", "700"))
 )
 UNLOCK_PRICE_CENTS = PLAN_PRICE_CENTS
+# Annual creator plan price (cents). Default $67/yr ≈ 20% off paying monthly.
+PLAN_PRICE_ANNUAL_CENTS = int(os.environ.get("PLAN_PRICE_ANNUAL_CENTS", "6700"))
 CURRENCY = os.environ.get("CURRENCY", "usd")
 
 # Polar — when unset, the app runs in "intent capture" mode (no live payments),
 # which is the PRD's "read demand before payments are wired" path.
 POLAR_ACCESS_TOKEN = os.environ.get("POLAR_ACCESS_TOKEN", "").strip()
+# Monthly product is required to enable payments. Annual is optional; when set,
+# both are offered on one Polar checkout (the customer picks the interval) and
+# either product satisfies checkout/webhook validation.
 POLAR_PRODUCT_ID = os.environ.get("POLAR_PRODUCT_ID", "").strip()
+POLAR_PRODUCT_ID_ANNUAL = os.environ.get("POLAR_PRODUCT_ID_ANNUAL", "").strip()
 POLAR_WEBHOOK_SECRET = os.environ.get("POLAR_WEBHOOK_SECRET", "").strip()
 POLAR_SERVER = os.environ.get("POLAR_SERVER", "production").strip().lower()
 POLAR_API_BASE = os.environ.get("POLAR_API_BASE", "").strip().rstrip("/")
@@ -59,6 +65,27 @@ ALLOW_FREE_UNLOCK = os.environ.get("ALLOW_FREE_UNLOCK", "").lower() in ("1", "tr
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "hello@talktobook.example")
 DMCA_EMAIL = os.environ.get("DMCA_EMAIL", "dmca@talktobook.example")
 
+# Post-purchase dashboard session. A signed, http-only cookie carries the
+# verified email — no passwords, no DB. Falls back to the Polar webhook secret
+# (stable + secret) so dashboards survive restarts without extra config; set
+# SESSION_SECRET explicitly in production for isolation from the webhook key.
+_DEV_SESSION_SECRET = "t2b-dev-session-secret-change-me"
+SESSION_SECRET = (
+    os.environ.get("SESSION_SECRET", "").strip()
+    or POLAR_WEBHOOK_SECRET
+    or POLAR_ACCESS_TOKEN
+    or _DEV_SESSION_SECRET
+)
+SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "60"))
+
+
+def session_secret_configured() -> bool:
+    """True only when SESSION_SECRET comes from a real secret, not the shipped
+    dev default. The dashboard refuses to sign or trust cookies otherwise, so a
+    cookie signed with the public constant can never authenticate a forged
+    session (fail closed)."""
+    return SESSION_SECRET != _DEV_SESSION_SECRET
+
 # Input guardrails.
 MAX_TRANSCRIPT_CHARS = int(os.environ.get("MAX_TRANSCRIPT_CHARS", str(800_000)))
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(8 * 1024 * 1024)))
@@ -71,6 +98,18 @@ def polar_api_base() -> str:
     if POLAR_SERVER == "sandbox":
         return "https://sandbox-api.polar.sh/v1"
     return "https://api.polar.sh/v1"
+
+
+def polar_product_ids() -> list[str]:
+    """Configured product IDs (monthly first, then annual if set)."""
+    return [p for p in (POLAR_PRODUCT_ID, POLAR_PRODUCT_ID_ANNUAL) if p]
+
+
+def product_for_interval(interval: str) -> str:
+    """Map a billing interval to its product id (annual when available)."""
+    if interval == "yearly" and POLAR_PRODUCT_ID_ANNUAL:
+        return POLAR_PRODUCT_ID_ANNUAL
+    return POLAR_PRODUCT_ID
 
 
 def polar_enabled() -> bool:

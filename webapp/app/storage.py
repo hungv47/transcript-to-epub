@@ -123,6 +123,32 @@ def subscriber_active(email: str | None) -> bool:
     return bool(rec.get("active"))
 
 
+def subscriber_record(email: str | None) -> dict:
+    """The stored subscriber record for an email (subscription_id, customer_id,
+    active flag), or an empty dict."""
+    key = normalize_email(email)
+    if not key:
+        return {}
+    return _read_subscribers().get(key) or {}
+
+
+def jobs_for_email(email: str | None, limit: int | None = None) -> list[Job]:
+    """All jobs attributed to this email, newest first. Scans JOBS_DIR — fine
+    for the MVP's volume; revisit with a per-email index if jobs grow large."""
+    key = normalize_email(email)
+    if not key or not config.JOBS_DIR.exists():
+        return []
+    jobs: list[Job] = []
+    for child in config.JOBS_DIR.iterdir():
+        if not child.is_dir():
+            continue
+        job = load(child.name)
+        if job and normalize_email(job.email) == key:
+            jobs.append(job)
+    jobs.sort(key=lambda j: j.created_at, reverse=True)
+    return jobs[:limit] if limit else jobs
+
+
 def mark_subscriber_active(
     email: str | None,
     *,

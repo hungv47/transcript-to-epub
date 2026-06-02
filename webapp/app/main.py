@@ -21,7 +21,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, engine, payments, storage
+from . import config, engine, payments, session, storage
 
 app = FastAPI(title=f"{config.APP_NAME} API")
 
@@ -208,6 +208,11 @@ async def success():
     return FileResponse(STATIC_DIR / "success.html")
 
 
+@app.get("/dashboard")
+async def dashboard():
+    return FileResponse(STATIC_DIR / "dashboard.html")
+
+
 @app.get("/terms")
 async def terms():
     return FileResponse(STATIC_DIR / "terms.html")
@@ -233,6 +238,37 @@ async def sitemap() -> Response:
     return Response(content=body, media_type="application/xml")
 
 
+# Markdown docs for AI assistants and crawlers (AEO/SEO). Served at the root so
+# URLs stay clean (/llms.txt, /product.md, ...). PUBLIC_URL is substituted so
+# absolute links resolve to the live origin in any environment.
+def _serve_doc(filename: str, media_type: str = "text/markdown; charset=utf-8") -> Response:
+    origin = (config.PUBLIC_URL or "").rstrip("/")
+    body = (STATIC_DIR / filename).read_text(encoding="utf-8")
+    if origin:
+        body = body.replace("https://talktobook.com", origin)
+    return Response(content=body, media_type=media_type)
+
+
+@app.get("/llms.txt", include_in_schema=False)
+async def llms_txt() -> Response:
+    return _serve_doc("llms.txt", "text/plain; charset=utf-8")
+
+
+@app.get("/product.md", include_in_schema=False)
+async def product_md() -> Response:
+    return _serve_doc("product.md")
+
+
+@app.get("/pricing.md", include_in_schema=False)
+async def pricing_md() -> Response:
+    return _serve_doc("pricing.md")
+
+
+@app.get("/faq.md", include_in_schema=False)
+async def faq_md() -> Response:
+    return _serve_doc("faq.md")
+
+
 @app.get("/healthz")
 async def healthz():
     """Liveness/readiness probe for the host platform."""
@@ -244,6 +280,8 @@ async def public_config():
     return {
         "app_name": config.APP_NAME,
         "price_cents": config.UNLOCK_PRICE_CENTS,
+        "price_annual_cents": config.PLAN_PRICE_ANNUAL_CENTS,
+        "annual_enabled": bool(config.POLAR_PRODUCT_ID_ANNUAL),
         "currency": config.CURRENCY,
         "payment_provider": "polar",
         "payments_enabled": config.payments_enabled(),
@@ -394,6 +432,160 @@ async def unlock(
     }
 
 
+@app.post("/api/checkout")
+async def plan_checkout(interval: str = Form("monthly"), email: str = Form("")):
+    """Start a Creator Plan checkout straight from the pricing section, with no
+    preview job. The plan is email-linked; generating and unlocking later with
+    the same email fulfills clean editions."""
+    interval = "yearly" if interval == "yearly" else "monthly"
+    _event("plan_checkout_click", interval=interval, email=bool(email), live=config.payments_enabled())
+    try:
+        result = await asyncio.to_thread(payments.create_plan_checkout, interval, email)
+    except payments.PaymentError as e:
+        raise HTTPException(502, str(e))
+    if result.get("url"):
+        return {"checkout_url": result["url"]}
+    _event("plan_checkout_intent", interval=interval, email=bool(email))
+    return {
+        "intent": True,
+        "message": "Payments are launching shortly. Generate a free preview now, and we'll email your plan link when it goes live.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Post-purchase dashboard (signed session, no accounts)
+# ---------------------------------------------------------------------------
+
+def _set_session_cookie(response: Response, request: Request, email: str) -> bool:
+    """Sign and attach the session cookie. Returns False (sets nothing) when no
+    real signing secret is configured, so the dashboard fails closed."""
+    token = session.issue(email)
+    if not token:
+        return False
+    response.set_cookie(
+        session.COOKIE_NAME,
+        token,
+        max_age=session.max_age(),
+        httponly=True,
+        secure=_is_https(request),
+        samesite="lax",
+        path="/",
+    )
+    return True
+
+
+@app.post("/api/session")
+async def start_session(request: Request, checkout_id: str = Form(...)):
+    """Establish a dashboard session from a verified Polar checkout. The success
+    page calls this right after payment: we verify the checkout server-side,
+    learn the email, mark the subscriber active (webhook-tolerant), and set a
+    signed cookie. A still-pending checkout returns 202 so the client can retry."""
+    checkout = await asyncio.to_thread(payments.get_checkout, checkout_id)
+    if not checkout:
+        return JSONResponse({"authenticated": False, "pending": True}, status_code=202)
+    metadata = checkout.get("metadata") or {}
+    email = storage.normalize_email(checkout.get("customer_email") or metadata.get("email"))
+    if not email:
+        return JSONResponse({"authenticated": False}, status_code=409)
+    storage.mark_subscriber_active(
+        email,
+        customer_id=checkout.get("customer_id"),
+        subscription_id=checkout.get("subscription_id"),
+        checkout_id=checkout_id,
+    )
+    _event("dashboard_session_start", email=True)
+    resp = JSONResponse({"authenticated": True, "email": email})
+    if not _set_session_cookie(resp, request, email):
+        return JSONResponse({"authenticated": False, "unavailable": True})
+    return resp
+
+
+def _plan_status(rec: dict) -> dict:
+    """Live plan status: prefer Polar's subscription record, fall back to the
+    local active flag when payments are off or the fetch fails."""
+    sub = payments.get_subscription(rec.get("subscription_id")) if rec.get("subscription_id") else None
+    if sub:
+        return {
+            "active": sub.get("status") in {"active", "trialing"},
+            "status": sub.get("status"),
+            "interval": sub.get("recurring_interval"),
+            "renews_at": sub.get("current_period_end"),
+            "cancel_at_period_end": bool(sub.get("cancel_at_period_end")),
+            "amount": sub.get("amount"),
+            "currency": sub.get("currency"),
+        }
+    active = bool(rec.get("active"))
+    return {
+        "active": active,
+        "status": "active" if active else "inactive",
+        "interval": None,
+        "renews_at": None,
+        "cancel_at_period_end": False,
+    }
+
+
+@app.get("/api/me")
+async def me(request: Request):
+    email = session.read(request.cookies.get(session.COOKIE_NAME))
+    if not email:
+        return JSONResponse({"authenticated": False}, status_code=401)
+    jobs = storage.jobs_for_email(email)
+    recent = []
+    for job in jobs[:8]:
+        item = {
+            "title": job.title,
+            "author": job.author,
+            "created_at": job.created_at,
+            "word_count": job.word_count,
+            "paid": job.paid,
+        }
+        if job.paid and job.download_token:
+            item["downloads"] = {k: _download_url(job, k, job.download_token) for k in job.paid_outputs}
+        recent.append(item)
+    # _plan_status makes a blocking Polar call; keep it off the event loop.
+    plan = await asyncio.to_thread(_plan_status, storage.subscriber_record(email))
+    return {
+        "authenticated": True,
+        "email": email,
+        "plan": plan,
+        "books": {"count": len(jobs), "recent": recent},
+        "capabilities": engine.capabilities(),
+    }
+
+
+@app.post("/api/portal")
+async def billing_portal(request: Request):
+    """Hand a signed-in buyer to Polar's hosted customer portal to manage or
+    cancel their subscription. We resolve their Polar customer id from the
+    subscriber record (falling back to the live subscription), mint a portal
+    session, and return its URL for the client to navigate to."""
+    email = session.read(request.cookies.get(session.COOKIE_NAME))
+    if not email:
+        raise HTTPException(401, "Not signed in.")
+    rec = storage.subscriber_record(email)
+    customer_id = rec.get("customer_id")
+    if not customer_id and rec.get("subscription_id"):
+        sub = await asyncio.to_thread(payments.get_subscription, rec["subscription_id"]) or {}
+        customer_id = sub.get("customer_id")
+        if customer_id:
+            storage.mark_subscriber_active(email, customer_id=customer_id)
+    if not customer_id:
+        raise HTTPException(409, "No billing account is linked to this email yet.")
+    url = await asyncio.to_thread(
+        payments.create_customer_portal_url, customer_id, f"{config.PUBLIC_URL}/dashboard"
+    )
+    if not url:
+        raise HTTPException(502, "Couldn't open the billing portal. Please try again shortly.")
+    return {"url": url}
+
+
+@app.post("/api/logout")
+async def logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(session.COOKIE_NAME, path="/")
+    return resp
+
+
 def _event_email(data: dict) -> str | None:
     customer = data.get("customer") or {}
     return data.get("customer_email") or data.get("email") or customer.get("email")
@@ -401,7 +593,7 @@ def _event_email(data: dict) -> str | None:
 
 async def _activate_subscription_for_job(data: dict) -> None:
     product_id = data.get("product_id") or (data.get("product") or {}).get("id")
-    if product_id and product_id != config.POLAR_PRODUCT_ID:
+    if product_id and product_id not in config.polar_product_ids():
         return
     metadata = data.get("metadata") or {}
     job_id = metadata.get("job_id")
@@ -450,7 +642,7 @@ async def polar_webhook(request: Request):
         email = data.get("email")
         active = [
             s for s in data.get("active_subscriptions", [])
-            if s.get("product_id") == config.POLAR_PRODUCT_ID
+            if s.get("product_id") in config.polar_product_ids()
         ]
         if active:
             s = active[0]

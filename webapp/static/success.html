@@ -50,8 +50,21 @@
     const checkoutId = params.get("checkout_id") || params.get("session_id");
     const KINDS = { epub: "EPUB", pdf: "PDF", azw3: "Kindle (AZW3)" };
 
+    // Establish the dashboard session from the verified checkout (once).
+    async function startSession() {
+      if (!checkoutId) return;
+      try {
+        const fd = new FormData(); fd.set("checkout_id", checkoutId);
+        await fetch("/api/session", { method: "POST", body: fd });
+      } catch (_) {}
+    }
+
     async function poll(tries = 0) {
-      if (!jobId) { fail("Missing job reference."); return; }
+      if (tries === 0) startSession();
+      if (!jobId) {
+        if (checkoutId) { showSubscriptionActive(); } else { fail("Missing reference."); }
+        return;
+      }
       try {
         const url = `/api/job/${jobId}` + (checkoutId ? `?checkout_id=${encodeURIComponent(checkoutId)}` : "");
         const job = await (await fetch(url)).json();
@@ -69,7 +82,18 @@
       const links = Object.entries(job.downloads)
         .map(([k, u]) => `<a class="btn btn-primary" style="margin:4px" href="${esc(u)}" download>${esc(KINDS[k] || k)}</a>`)
         .join(" ");
-      document.getElementById("download-links").innerHTML = links;
+      document.getElementById("download-links").innerHTML = links +
+        ' <a class="btn btn-ghost" style="margin:4px" href="/dashboard">View your dashboard</a>';
+      document.getElementById("downloads").hidden = false;
+    }
+    function showSubscriptionActive() {
+      document.getElementById("title").textContent = "Your Creator Plan is active";
+      document.getElementById("status").textContent =
+        "Now generate your first clean edition. Use the same email you just paid with, and your EPUB, PDF, and Kindle unlock automatically.";
+      document.querySelector("#downloads h4").textContent = "Next steps";
+      document.getElementById("download-links").innerHTML =
+        '<a class="btn btn-primary" href="/#start">Generate a book</a>' +
+        ' <a class="btn btn-ghost" style="margin-left:.5rem" href="/dashboard">Go to your dashboard</a>';
       document.getElementById("downloads").hidden = false;
     }
     function fail(msg) {

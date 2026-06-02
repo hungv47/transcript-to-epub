@@ -103,15 +103,32 @@ code {
 }
 .skip:focus { top: 16px; }
 
+/* Reveal system: progressive enhancement only. Content is fully visible by
+   default; these rules apply only once JS adds .motion (never added under
+   reduced motion), so a reveal enhances an already-visible page. */
 .motion [data-reveal] {
   opacity: 0;
-  transform: translateY(14px);
-  transition: opacity .58s var(--ease), transform .58s var(--ease);
+  transform: translateY(16px);
+  transition: opacity .62s var(--ease), transform .62s var(--ease);
 }
-.motion [data-reveal].in {
-  opacity: 1;
-  transform: none;
+.motion [data-reveal="fade"] { transform: none; }
+/* A group container stays put and lets its children carry the motion. */
+.motion [data-reveal="group"] { opacity: 1; transform: none; transition: none; }
+.motion [data-reveal].in { opacity: 1; transform: none; }
+
+/* Before/after is the page's one earned choreography: the two panels slide
+   together as the raw transcript resolves into a designed page. */
+.motion .ba .ba-card,
+.motion .ba .ba-arrow {
+  opacity: 0;
+  transition: opacity .6s var(--ease), transform .6s var(--ease);
 }
+.motion .ba .ba-before { transform: translateX(-24px); }
+.motion .ba .ba-after { transform: translateX(24px); }
+.motion .ba .ba-arrow { transform: scale(.82); transition-delay: .28s; }
+.motion .ba.in .ba-card,
+.motion .ba.in .ba-arrow { opacity: 1; transform: none; }
+
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
   .motion [data-reveal] {
@@ -119,7 +136,15 @@ code {
     transform: none;
     transition: none;
   }
-  .usecase-card { transition: none; }
+  .motion .ba .ba-card,
+  .motion .ba .ba-arrow {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .usecase-card,
+  .usecase-card h3,
+  .usecase-card h3::after { transition: none; }
 }
 
 .site-header {
@@ -300,47 +325,55 @@ code {
 }
 .usecase-card {
   position: relative;
-  overflow: hidden;
   grid-column: span 3;
   min-height: 190px;
   display: flex;
   flex-direction: column;
-  padding: 22px;
+  padding: 24px;
   border: 1px solid var(--color-rule);
   border-radius: var(--radius);
   background: var(--color-panel);
-  transition: transform .26s var(--ease), border-color .26s var(--ease), box-shadow .26s var(--ease);
-}
-.usecase-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: var(--color-accent);
-  transform: scaleY(0);
-  transform-origin: bottom;
-  transition: transform .36s var(--ease);
+  transition: transform .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease);
 }
 .usecase-card:hover {
   transform: translateY(-4px);
-  border-color: color-mix(in srgb, var(--color-accent) 70%, var(--color-rule));
-  box-shadow: 0 22px 50px -42px var(--color-accent-2);
-}
-.usecase-card:hover::before,
-.motion .usecase-card.in::before {
-  transform: scaleY(1);
+  border-color: color-mix(in srgb, var(--color-ink) 28%, var(--color-rule));
+  box-shadow: 0 26px 52px -40px rgba(30, 26, 23, .5);
 }
 .usecase-card--wide { grid-column: span 6; }
 .usecase-card--tall { grid-column: span 6; }
 .usecase-card--primary {
-  border-color: var(--color-accent);
-  background: linear-gradient(180deg, var(--color-panel), color-mix(in srgb, var(--color-accent-soft) 36%, var(--color-panel)));
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-rule));
+  background: linear-gradient(155deg, var(--color-panel) 0%, color-mix(in srgb, var(--color-accent-soft) 42%, var(--color-panel)) 100%);
+}
+.usecase-card--primary:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 62%, var(--color-rule));
 }
 .usecase-card h3 {
   font-family: var(--font-ui);
-  font-size: 1.02rem;
+  font-size: 1.08rem;
   font-weight: 700;
+  letter-spacing: -.01em;
+  color: var(--color-ink);
+  transition: color .3s var(--ease);
 }
+/* Hover-only accent underline that draws from the left — a horizontal,
+   intentional editorial mark, not a relocated side stripe. The primary card
+   carries it always-on as the section's single committed accent. */
+.usecase-card h3::after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 2px;
+  margin-top: 11px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transition: width .44s var(--ease);
+}
+.usecase-card:hover h3 { color: var(--color-accent-2); }
+.usecase-card:hover h3::after { width: 2.25rem; }
+.usecase-card--primary h3::after { width: 2.25rem; }
+.usecase-card--primary:hover h3::after { width: 3rem; }
 .usecase-card p {
   margin: auto 0 0;
   color: var(--color-ink-2);
@@ -402,11 +435,21 @@ code {
   line-height: 1.75;
 }
 .ba-page blockquote {
+  position: relative;
   margin: 0;
-  padding-left: 16px;
-  border-left: 3px solid var(--color-accent);
+  padding-left: 24px;
   color: var(--color-ink-2);
   font-style: italic;
+}
+.ba-page blockquote::before {
+  content: "\201C";
+  position: absolute;
+  left: -2px;
+  top: -.04em;
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--color-accent);
 }
 
 .app {
@@ -488,7 +531,7 @@ textarea {
 input::placeholder,
 textarea::placeholder {
   color: var(--color-muted);
-  opacity: .82;
+  opacity: 1; /* muted is already lighter than entered ink text; .82 dropped it below 4.5:1 */
 }
 input:focus,
 textarea:focus {
@@ -643,6 +686,11 @@ input[type=color] {
   font-size: .82rem;
   font-weight: 700;
 }
+.upsell-annual {
+  margin: 6px 0 0;
+  color: var(--color-ink-2);
+  font-size: .92rem;
+}
 .upsell-list {
   columns: 2;
   column-gap: 24px;
@@ -692,6 +740,71 @@ input[type=color] {
   line-height: 1.55;
 }
 
+.bill-toggle-wrap {
+  margin-bottom: 28px;
+  text-align: center;
+}
+.bill-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-rule);
+  border-radius: 999px;
+  background: var(--color-panel);
+}
+.bill-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: var(--color-ink-2);
+  font-size: .95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .26s var(--ease), color .26s var(--ease);
+}
+.bill-toggle label:hover { color: var(--color-ink); }
+.bill-toggle input:checked + label {
+  background: var(--color-ink);
+  color: var(--color-panel);
+}
+.bill-toggle input:focus-visible + label {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.bill-save {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-2);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+.bill-toggle input:checked + label .bill-save {
+  background: color-mix(in srgb, var(--color-panel) 24%, transparent);
+  color: var(--color-panel);
+}
+
+/* Toggle feedback: the price rises in on every switch; the Save badge pulses
+   once when yearly is chosen. Reduced-motion users get the instant swap. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes price-pop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.1); }
+    100% { transform: scale(1); }
+  }
+  @keyframes bill-save-pulse {
+    0%   { transform: scale(1); }
+    42%  { transform: scale(1.16); }
+    100% { transform: scale(1); }
+  }
+  .plan-price.price-pop { animation: price-pop .42s var(--ease); transform-origin: left center; }
+  .bill-save.is-pulsing { animation: bill-save-pulse .44s var(--ease); }
+}
+
 .pricing {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -738,6 +851,12 @@ input[type=color] {
   font-size: .9rem;
   font-weight: 600;
 }
+.plan-msg {
+  margin: 12px 0 0;
+  color: var(--color-ink-2);
+  font-size: .9rem;
+}
+.plan-msg.err { color: var(--color-error); }
 .plan ul {
   list-style: none;
   margin: 0 0 22px;
@@ -797,6 +916,13 @@ input[type=color] {
   color: var(--color-ink-2);
   font-family: var(--font-display);
   line-height: 1.65;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .faq-list details[open] p { animation: faq-answer .42s var(--ease) both; }
+}
+@keyframes faq-answer {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
 .site-footer {
@@ -882,6 +1008,11 @@ input[type=color] {
   .ba-arrow {
     transform: rotate(90deg);
   }
+  /* Stacked vertically on mobile: converge along Y, not X. */
+  .motion .ba .ba-before { transform: translateY(18px); }
+  .motion .ba .ba-after { transform: translateY(18px); }
+  .motion .ba .ba-arrow { transform: rotate(90deg) scale(.82); }
+  .motion .ba.in .ba-arrow { transform: rotate(90deg); }
   .upsell-list { columns: 1; }
 }
 
@@ -911,3 +1042,107 @@ input[type=color] {
     width: 100%;
   }
 }
+
+/* ----------------------------------------------------------------------- */
+/* Post-purchase dashboard — system page, inherits quiet-publishing-desk.   */
+/* Status tokens declared in a second :root block to leave the locked       */
+/* palette above untouched.                                                 */
+/* ----------------------------------------------------------------------- */
+:root {
+  --dash-gap: clamp(1rem, 2.5vw, 1.75rem);
+  --color-ok: #3f5c16;
+  --color-ok-soft: #eef2e0;
+  --color-ok-line: #cdd9ab;
+  --color-warn: #8a5a12;
+  --color-warn-soft: #f7ecd6;
+  --color-warn-line: #e6cfa0;
+}
+.dash { width: 100%; max-width: var(--wide); margin-inline: auto; }
+.dash-nav { display: inline-flex; gap: .5rem; align-items: center; }
+.dash-nav .btn { white-space: nowrap; }
+/* The header "Make a book" duplicates the page's primary CTA — drop it on
+   narrow screens so the two nav buttons never wrap to two lines. */
+@media (max-width: 460px) { .dash-nav-make { display: none; } }
+
+.dash-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  justify-content: space-between; gap: 1rem;
+}
+.dash-hello { font-family: var(--font-display); font-size: clamp(1.9rem, 4.5vw, 2.7rem); line-height: 1.05; }
+.dash-email { margin: .35rem 0 0; color: var(--color-muted); font-size: .95rem; }
+
+.dash-grid {
+  display: grid; grid-template-columns: 1.35fr 1fr;
+  gap: var(--dash-gap); margin-top: 2rem;
+}
+@media (max-width: 760px) { .dash-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.dash-panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius);
+  padding: clamp(1.25rem, 3vw, 1.85rem);
+}
+.dash-panel h2 {
+  font-family: var(--font-ui); font-weight: 600;
+  font-size: .82rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--color-muted); margin-bottom: 1rem;
+}
+.dash-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.dash-panel-head h2 { margin-bottom: 0; }
+
+.status-pill {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--font-ui); font-weight: 600; font-size: .78rem;
+  padding: .32em .72em; border-radius: 999px;
+  border: 1px solid var(--color-rule); color: var(--color-muted);
+  background: var(--color-paper-2); white-space: nowrap;
+}
+.status-pill::before { content: ""; width: .5em; height: .5em; border-radius: 50%; background: currentColor; }
+.status-pill.is-active { color: var(--color-ok); background: var(--color-ok-soft); border-color: var(--color-ok-line); }
+.status-pill.is-canceling { color: var(--color-warn); background: var(--color-warn-soft); border-color: var(--color-warn-line); }
+.status-pill.is-inactive { color: var(--color-muted); background: var(--color-paper-2); border-color: var(--color-rule); }
+
+.plan-rows { margin: 0; }
+.plan-rows > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  padding: .7rem 0; border-bottom: 1px solid var(--color-rule);
+}
+.plan-rows > div:last-child { border-bottom: 0; }
+.plan-rows dt { margin: 0; color: var(--color-muted); font-size: .9rem; }
+.plan-rows dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dash-foot { margin: 1.1rem 0 0; font-size: .9rem; line-height: 1.55; }
+.dash-foot a { color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; }
+.dash-billing-btn { margin-top: 1rem; }
+.plan-err { margin: .6rem 0 0; color: var(--color-error); font-size: .88rem; }
+
+.dash-panel--stat { display: flex; flex-direction: column; }
+.stat-big {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(2.8rem, 8vw, 4rem); line-height: 1; margin: .1em 0 .15em;
+  font-variant-numeric: tabular-nums; color: var(--color-ink);
+}
+.stat-label { margin: 0; color: var(--color-muted); font-size: .95rem; }
+
+.book-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; padding: .8rem 0; border-top: 1px solid var(--color-rule);
+}
+.book-row:first-child { border-top: 0; padding-top: 0; }
+.book-title { font-family: var(--font-display); font-size: 1.08rem; line-height: 1.25; }
+.book-meta { margin-top: .15rem; color: var(--color-muted); font-size: .85rem; }
+.book-dl { display: flex; flex-wrap: wrap; gap: .35rem .8rem; justify-content: flex-end; flex-shrink: 0; }
+.book-dl a { font-size: .85rem; font-weight: 600; color: var(--color-accent); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+.book-tag { font-size: .8rem; color: var(--color-muted); font-style: italic; }
+
+.perk-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .7rem; }
+.perk-list li { display: flex; gap: .6rem; align-items: flex-start; line-height: 1.45; }
+.perk-list li::before { content: "✓"; color: var(--color-accent); font-weight: 700; flex-shrink: 0; }
+.muted-block { color: var(--color-muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  #dash-app.is-ready [data-reveal] { animation: dash-rise .5s var(--ease) backwards; }
+  #dash-app.is-ready .dash-grid > :nth-child(2) { animation-delay: .06s; }
+  #dash-app.is-ready > section[data-reveal] { animation-delay: .12s; }
+}
+@keyframes dash-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }

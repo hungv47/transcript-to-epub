@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#F7F0E5" />
+  <meta name="robots" content="noindex" />
+  <title>Your dashboard - TalkToBook</title>
+  <meta name="description" content="Your TalkToBook Creator Plan: status, the books you've made, and what your plan includes." />
+  <link rel="canonical" href="https://talktobook.com/dashboard" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <a class="wordmark" href="/">TalkToBook</a>
+    <nav aria-label="Primary" class="dash-nav">
+      <a class="btn btn-ghost btn-sm dash-nav-make" href="/#start">Make a book</a>
+      <button type="button" class="btn btn-ghost btn-sm" id="logout-btn" hidden>Sign out</button>
+    </nav>
+  </header>
+
+  <main id="main" class="section section--app">
+    <div class="dash">
+      <!-- Loading -->
+      <div id="dash-loading" class="dash-state">
+        <p class="result-meta">Loading your dashboard…</p>
+      </div>
+
+      <!-- Signed out / no session -->
+      <div id="dash-signedout" class="dash-state" hidden>
+        <article class="card">
+          <span class="result-tag">Dashboard</span>
+          <h1 class="section-title" style="font-size:2.1rem;margin:.35em 0 .25em;">We'll recognize you right after checkout</h1>
+          <p class="result-meta">Your dashboard opens automatically when you finish a Creator Plan checkout. If you've already subscribed, open the link from your receipt to return here — a sign-in-from-anywhere flow is coming next.</p>
+          <p style="margin-top:1.25rem;">
+            <a class="btn btn-primary" href="/#pricing">See the Creator Plan</a>
+            <a class="btn btn-ghost" href="/#start" style="margin-left:.5rem;">Generate a free preview</a>
+          </p>
+        </article>
+      </div>
+
+      <!-- Signed in -->
+      <div id="dash-app" class="dash-state" hidden>
+        <div class="dash-head" data-reveal>
+          <div>
+            <h1 class="dash-hello">Welcome back</h1>
+            <p class="dash-email" id="dash-email"></p>
+          </div>
+          <a class="btn btn-primary" href="/#start">Generate a new book</a>
+        </div>
+
+        <div class="dash-grid">
+          <section class="dash-panel" data-reveal aria-labelledby="plan-h">
+            <div class="dash-panel-head">
+              <h2 id="plan-h">Creator Plan</h2>
+              <span class="status-pill" id="plan-pill">—</span>
+            </div>
+            <dl class="plan-rows" id="plan-rows"></dl>
+            <p class="dash-foot muted-block" id="plan-foot"></p>
+            <button type="button" class="btn btn-ghost btn-sm dash-billing-btn" id="manage-billing-btn" hidden>Manage billing</button>
+            <p class="plan-err" id="billing-err" role="status" hidden></p>
+          </section>
+
+          <section class="dash-panel dash-panel--stat" data-reveal aria-labelledby="books-h">
+            <h2 id="books-h">Books generated</h2>
+            <p class="stat-big" id="books-count">0</p>
+            <p class="stat-label" id="books-label">clean editions made with your plan</p>
+          </section>
+        </div>
+
+        <section class="dash-panel" data-reveal aria-labelledby="recent-h" style="margin-top:var(--dash-gap);">
+          <h2 id="recent-h">Recent books</h2>
+          <div id="recent-list"></div>
+          <p class="muted-block" id="recent-empty" hidden>No books yet. Paste a YouTube URL or upload a transcript to make your first clean edition.</p>
+        </section>
+
+        <section class="dash-panel" data-reveal aria-labelledby="perks-h" style="margin-top:var(--dash-gap);">
+          <h2 id="perks-h">What your plan includes</h2>
+          <ul class="perk-list" id="perk-list"></ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const KINDS = { epub: "EPUB", pdf: "PDF", azw3: "Kindle (AZW3)" };
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function show(id) {
+      for (const s of document.querySelectorAll(".dash-state")) s.hidden = (s.id !== id);
+    }
+    function fmtDate(v) {
+      if (!v) return null;
+      const d = typeof v === "number" ? new Date(v * 1000) : new Date(v);
+      if (isNaN(d)) return null;
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    }
+    function fmtMoney(cents, cur) {
+      if (cents == null) return null;
+      try { return new Intl.NumberFormat(undefined, { style: "currency", currency: (cur || "usd").toUpperCase() }).format(cents / 100); }
+      catch { return "$" + (cents / 100).toFixed(2); }
+    }
+
+    function renderPlan(plan) {
+      const pill = $("plan-pill");
+      const rows = $("plan-rows");
+      const foot = $("plan-foot");
+      const interval = plan.interval === "year" ? "Yearly" : plan.interval === "month" ? "Monthly" : null;
+      const renews = fmtDate(plan.renews_at);
+      const price = fmtMoney(plan.amount, plan.currency);
+
+      if (plan.cancel_at_period_end) {
+        pill.textContent = "Canceling";
+        pill.className = "status-pill is-canceling";
+      } else if (plan.active) {
+        pill.textContent = "Active";
+        pill.className = "status-pill is-active";
+      } else {
+        pill.textContent = "Inactive";
+        pill.className = "status-pill is-inactive";
+      }
+
+      const pairs = [];
+      if (interval) pairs.push(["Billing", interval + (price ? " · " + price : "")]);
+      else if (price) pairs.push(["Price", price]);
+      if (renews) pairs.push([plan.cancel_at_period_end ? "Access until" : "Renews", renews]);
+      rows.innerHTML = pairs.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("");
+
+      if (!plan.active && !plan.cancel_at_period_end) {
+        foot.innerHTML = 'Your plan isn’t active. <a href="/#pricing">Reactivate the Creator Plan</a> to keep making clean editions.';
+      } else if (plan.cancel_at_period_end) {
+        foot.textContent = "Your plan will not renew. Clean editions stay available until the date above.";
+      } else {
+        foot.textContent = "Manage or cancel anytime — access continues to the end of the paid period.";
+      }
+
+      // The billing portal only exists for a real Polar customer; show it when
+      // there's a live (or winding-down) subscription to manage.
+      const billBtn = $("manage-billing-btn");
+      if (billBtn) billBtn.hidden = !(plan.active || plan.cancel_at_period_end);
+    }
+
+    function renderBooks(books) {
+      $("books-count").textContent = books.count;
+      $("books-label").textContent = books.count === 1 ? "clean edition made with your plan" : "clean editions made with your plan";
+      const list = $("recent-list");
+      const empty = $("recent-empty");
+      if (!books.recent || !books.recent.length) {
+        list.innerHTML = "";
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      list.innerHTML = books.recent.map(b => {
+        const date = fmtDate(b.created_at);
+        const words = b.word_count ? `${b.word_count.toLocaleString()} words` : "";
+        const meta = [date, words].filter(Boolean).join(" · ");
+        const dls = (b.paid && b.downloads)
+          ? Object.entries(b.downloads).map(([k, u]) => `<a href="${esc(u)}" download>${esc(KINDS[k] || k)}</a>`).join("")
+          : `<span class="book-tag">Preview only</span>`;
+        return `<div class="book-row">
+          <div><div class="book-title">${esc(b.title || "Untitled")}</div><div class="book-meta">${esc(meta)}</div></div>
+          <div class="book-dl">${dls}</div>
+        </div>`;
+      }).join("");
+    }
+
+    function renderPerks(caps) {
+      const formats = ["epub", "pdf", "azw3"].filter(k => caps && caps[k]).map(k => KINDS[k]);
+      const fmtLine = formats.length
+        ? "Download as " + formats.join(", ")
+        : "Clean EPUB downloads";
+      const perks = [
+        "Unlimited clean editions while your plan is active",
+        "The “Made with TalkToBook” colophon removed",
+        "Your own cover image and accent color",
+        fmtLine,
+      ];
+      if (caps && !caps.azw3) perks.push("Kindle (AZW3) export — coming soon");
+      $("perk-list").innerHTML = perks.map(p => `<li>${esc(p)}</li>`).join("");
+    }
+
+    async function startSessionFromCheckout() {
+      // If we arrived from checkout (?checkout_id=…) without a cookie yet,
+      // establish the session before loading the dashboard. Returns true if a
+      // session start was attempted, so the caller knows a retry is worthwhile.
+      const cid = new URLSearchParams(location.search).get("checkout_id");
+      if (!cid) return false;
+      try {
+        const fd = new FormData(); fd.set("checkout_id", cid);
+        await fetch("/api/session", { method: "POST", body: fd });
+      } catch (_) {}
+      return true;
+    }
+
+    async function load() {
+      try {
+        let res = await fetch("/api/me");
+        if (res.status === 401 && await startSessionFromCheckout()) {
+          res = await fetch("/api/me");
+        }
+        if (res.status === 401) { show("dash-signedout"); return; }
+        const data = await res.json();
+        if (!data.authenticated) { show("dash-signedout"); return; }
+        $("dash-email").textContent = data.email;
+        renderPlan(data.plan || {});
+        renderBooks(data.books || { count: 0, recent: [] });
+        renderPerks(data.capabilities || {});
+        $("logout-btn").hidden = false;
+        show("dash-app");
+        requestAnimationFrame(() => $("dash-app").classList.add("is-ready"));
+      } catch (_) {
+        show("dash-signedout");
+      }
+    }
+
+    $("logout-btn").addEventListener("click", async () => {
+      try { await fetch("/api/logout", { method: "POST" }); } catch (_) {}
+      location.href = "/";
+    });
+
+    $("manage-billing-btn").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const err = $("billing-err");
+      err.hidden = true;
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Opening…";
+      try {
+        const res = await fetch("/api/portal", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok || !data.url) throw new Error(data.detail || "Couldn't open the billing portal.");
+        location.href = data.url;
+      } catch (ex) {
+        err.textContent = ex.message || "Couldn't open the billing portal. Try again shortly.";
+        err.hidden = false;
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>

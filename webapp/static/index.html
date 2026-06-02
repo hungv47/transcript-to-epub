@@ -11,6 +11,11 @@
   <meta name="robots" content="index,follow" />
   <meta name="author" content="TalkToBook" />
   <link rel="canonical" href="https://talktobook.com/" />
+  <!-- Markdown editions for AI assistants and crawlers (AEO) -->
+  <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLM-readable site summary" />
+  <link rel="alternate" type="text/markdown" href="/product.md" title="Product overview (Markdown)" />
+  <link rel="alternate" type="text/markdown" href="/pricing.md" title="Pricing (Markdown)" />
+  <link rel="alternate" type="text/markdown" href="/faq.md" title="FAQ (Markdown)" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
   <link rel="alternate" type="application/rss+xml" title="TalkToBook" href="/feed.xml" />
@@ -212,6 +217,7 @@
               <h4>Creator Plan</h4>
               <span class="price"><span id="price">$7</span><small>/mo</small></span>
             </div>
+            <p class="upsell-annual">Or <span id="price-annual">$67</span>/year (about 20% off). Pick monthly or yearly at checkout.</p>
             <ul class="upsell-list">
               <li>Unlimited clean editions while active</li>
               <li>Remove the colophon</li>
@@ -233,7 +239,7 @@
                 <span>Cover image <small>(optional, PNG/JPG, about 2:3)</small></span>
                 <input type="file" name="cover" accept=".png,.jpg,.jpeg" />
               </label>
-              <button type="submit" class="btn btn-primary btn-block" id="unlock-btn">Start unlimited for <span id="unlock-price">$7</span>/mo</button>
+              <button type="submit" class="btn btn-primary btn-block" id="unlock-btn"><span>Start unlimited for <span id="unlock-price">$7</span>/mo</span></button>
               <p class="upsell-msg" id="unlock-msg" role="status" hidden></p>
               <details class="cover-prompt-wrap">
                 <summary>Get an AI cover prompt</summary>
@@ -282,7 +288,7 @@
       <h2 class="section-title">From transcript dump to clean page.</h2>
       <p class="section-sub">The engine strips timestamps, merges fragments into paragraphs, and sets interviewer turns apart. It does not rewrite your ideas.</p>
     </header>
-    <div class="ba" data-reveal>
+    <div class="ba" data-reveal="group">
       <figure class="ba-card ba-before">
         <figcaption>Before, raw transcript</figcaption>
         <pre class="ba-raw">**00:00:00**: &gt;&gt; Ada: Welcome back. Today we're
@@ -312,6 +318,14 @@ by being boring in the best way.</pre>
       <h2 class="section-title">Preview the book free, then subscribe when it is worth shipping.</h2>
       <p class="section-sub">Judge the transcript first. Keep the plan only while you are turning recordings into assets.</p>
     </header>
+    <div class="bill-toggle-wrap" data-reveal>
+      <div class="bill-toggle" role="radiogroup" aria-label="Billing period">
+        <input class="sr-only" type="radio" name="billing" id="bill-monthly" value="monthly" checked />
+        <label for="bill-monthly">Monthly</label>
+        <input class="sr-only" type="radio" name="billing" id="bill-yearly" value="yearly" />
+        <label for="bill-yearly">Yearly <span class="bill-save">Save 20%</span></label>
+      </div>
+    </div>
     <div class="pricing">
       <article class="plan" data-reveal>
         <h3>Free preview</h3>
@@ -322,11 +336,12 @@ by being boring in the best way.</pre>
           <li>Plain auto cover</li>
           <li class="muted">"Made with TalkToBook" colophon</li>
         </ul>
+        <a class="btn btn-ghost btn-block" href="#start">Generate free preview</a>
       </article>
       <article class="plan plan-feature" data-reveal>
         <span class="plan-badge">Launch price</span>
         <h3>Creator Plan</h3>
-        <p class="plan-price"><span id="plan-price">$7</span> <small>/month</small></p>
+        <p class="plan-price"><span id="plan-price">$7</span> <small id="plan-period">/month</small></p>
         <ul>
           <li>Everything in the preview</li>
           <li>Unlimited clean editions</li>
@@ -334,7 +349,8 @@ by being boring in the best way.</pre>
           <li>Your cover and accent</li>
           <li><strong>EPUB, PDF, and Kindle</strong></li>
         </ul>
-        <a class="btn btn-primary btn-block" href="#start">Generate free EPUB</a>
+        <button type="button" class="btn btn-primary btn-block" id="get-plan-btn">Get the Creator Plan</button>
+        <p class="plan-msg" id="get-plan-msg" role="status" hidden></p>
       </article>
     </div>
   </section>
