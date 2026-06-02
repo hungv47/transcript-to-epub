@@ -318,6 +318,14 @@ by being boring in the best way.</pre>
       <h2 class="section-title">Preview the book free, then subscribe when it is worth shipping.</h2>
       <p class="section-sub">Judge the transcript first. Keep the plan only while you are turning recordings into assets.</p>
     </header>
+    <div class="bill-toggle-wrap" data-reveal>
+      <div class="bill-toggle" role="radiogroup" aria-label="Billing period">
+        <input class="sr-only" type="radio" name="billing" id="bill-monthly" value="monthly" checked />
+        <label for="bill-monthly">Monthly</label>
+        <input class="sr-only" type="radio" name="billing" id="bill-yearly" value="yearly" />
+        <label for="bill-yearly">Yearly <span class="bill-save">Save 20%</span></label>
+      </div>
+    </div>
     <div class="pricing">
       <article class="plan" data-reveal>
         <h3>Free preview</h3>
@@ -332,8 +340,8 @@ by being boring in the best way.</pre>
       <article class="plan plan-feature" data-reveal>
         <span class="plan-badge">Launch price</span>
         <h3>Creator Plan</h3>
-        <p class="plan-price"><span id="plan-price">$7</span> <small>/month</small></p>
-        <p class="plan-annual">or <span id="plan-price-annual">$67</span>/year <span class="plan-annual-save">(about 20% off)</span></p>
+        <p class="plan-price"><span id="plan-price">$7</span> <small id="plan-period">/month</small></p>
+        <p class="plan-meta" id="plan-meta">or $67/year</p>
         <ul>
           <li>Everything in the preview</li>
           <li>Unlimited clean editions</li>

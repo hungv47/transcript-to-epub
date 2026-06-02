@@ -1,7 +1,7 @@
 // TalkToBook front-end. Plain JS — no build step.
 const $ = (sel, root = document) => root.querySelector(sel);
 
-let CONFIG = { price_cents: 700, currency: "usd", payments_enabled: false };
+let CONFIG = { price_cents: 700, price_annual_cents: 6700, currency: "usd", payments_enabled: false };
 let CURRENT_JOB = null;
 
 function money(cents, currency) {
@@ -9,6 +9,32 @@ function money(cents, currency) {
     .format(cents / 100)
     .replace(/\.00$/, "");
 }
+
+// Pricing-section billing toggle. The Polar checkout offers both intervals
+// regardless; this only swaps what the Creator Plan card displays.
+function selectedBilling() {
+  return document.querySelector('input[name="billing"]:checked')?.value || "monthly";
+}
+
+function renderPlanPrice(period) {
+  const priceEl = document.getElementById("plan-price");
+  const periodEl = document.getElementById("plan-period");
+  const metaEl = document.getElementById("plan-meta");
+  const yearly = CONFIG.price_annual_cents ? money(CONFIG.price_annual_cents, CONFIG.currency) : null;
+  if (period === "yearly" && yearly) {
+    if (priceEl) priceEl.textContent = yearly;
+    if (periodEl) periodEl.textContent = "/year";
+    if (metaEl) metaEl.textContent = `${money(Math.round(CONFIG.price_annual_cents / 12), CONFIG.currency)}/month, billed yearly`;
+  } else {
+    if (priceEl) priceEl.textContent = money(CONFIG.price_cents, CONFIG.currency);
+    if (periodEl) periodEl.textContent = "/month";
+    if (metaEl) metaEl.textContent = yearly ? `or ${yearly}/year` : "";
+  }
+}
+
+document.querySelectorAll('input[name="billing"]').forEach((radio) => {
+  radio.addEventListener("change", () => renderPlanPrice(radio.value));
+});
 
 async function loadConfig() {
   try {
@@ -18,17 +44,15 @@ async function loadConfig() {
     // now-absent #unlock-price node instead of formatting then clobbering it.
     applyPaymentMode();
     const p = money(CONFIG.price_cents, CONFIG.currency);
-    ["price", "unlock-price", "plan-price"].forEach((id) => {
+    ["price", "unlock-price"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.textContent = p;
     });
     if (CONFIG.price_annual_cents) {
-      const pa = money(CONFIG.price_annual_cents, CONFIG.currency);
-      ["plan-price-annual", "price-annual"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = pa;
-      });
+      const ann = document.getElementById("price-annual");
+      if (ann) ann.textContent = money(CONFIG.price_annual_cents, CONFIG.currency);
     }
+    renderPlanPrice(selectedBilling());
     if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {
       const form = document.getElementById("preview-form");
       const err = document.getElementById("preview-error");
