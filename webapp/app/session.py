@@ -34,8 +34,12 @@ def _sign(payload: str) -> str:
     return _b64e(sig)
 
 
-def issue(email: str, ttl_days: int | None = None) -> str:
-    """Mint a signed session token for an email, valid for ttl_days."""
+def issue(email: str, ttl_days: int | None = None) -> str | None:
+    """Mint a signed session token for an email, valid for ttl_days. Returns
+    None when no real signing secret is configured, so the dashboard stays off
+    rather than handing out cookies signed with the public dev default."""
+    if not config.session_secret_configured():
+        return None
     ttl = (config.SESSION_TTL_DAYS if ttl_days is None else ttl_days) * 86400
     body = {"email": (email or "").strip().lower(), "exp": int(time.time()) + ttl}
     payload = _b64e(json.dumps(body, separators=(",", ":")).encode("utf-8"))
@@ -43,8 +47,10 @@ def issue(email: str, ttl_days: int | None = None) -> str:
 
 
 def read(token: str | None) -> str | None:
-    """Return the email from a valid, unexpired token, else None."""
-    if not token or "." not in token:
+    """Return the email from a valid, unexpired token, else None. Always None
+    when no real signing secret is configured, so a cookie forged with the
+    public dev default can never authenticate."""
+    if not config.session_secret_configured() or not token or "." not in token:
         return None
     payload, _, sig = token.partition(".")
     if not hmac.compare_digest(sig, _sign(payload)):

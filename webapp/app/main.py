@@ -440,7 +440,7 @@ async def plan_checkout(interval: str = Form("monthly"), email: str = Form("")):
     interval = "yearly" if interval == "yearly" else "monthly"
     _event("plan_checkout_click", interval=interval, email=bool(email), live=config.payments_enabled())
     try:
-        result = payments.create_plan_checkout(interval, email)
+        result = await asyncio.to_thread(payments.create_plan_checkout, interval, email)
     except payments.PaymentError as e:
         raise HTTPException(502, str(e))
     if result.get("url"):
@@ -456,16 +456,22 @@ async def plan_checkout(interval: str = Form("monthly"), email: str = Form("")):
 # Post-purchase dashboard (signed session, no accounts)
 # ---------------------------------------------------------------------------
 
-def _set_session_cookie(response: Response, request: Request, email: str) -> None:
+def _set_session_cookie(response: Response, request: Request, email: str) -> bool:
+    """Sign and attach the session cookie. Returns False (sets nothing) when no
+    real signing secret is configured, so the dashboard fails closed."""
+    token = session.issue(email)
+    if not token:
+        return False
     response.set_cookie(
         session.COOKIE_NAME,
-        session.issue(email),
+        token,
         max_age=session.max_age(),
         httponly=True,
         secure=_is_https(request),
         samesite="lax",
         path="/",
     )
+    return True
 
 
 @app.post("/api/session")
@@ -474,7 +480,7 @@ async def start_session(request: Request, checkout_id: str = Form(...)):
     page calls this right after payment: we verify the checkout server-side,
     learn the email, mark the subscriber active (webhook-tolerant), and set a
     signed cookie. A still-pending checkout returns 202 so the client can retry."""
-    checkout = payments.get_checkout(checkout_id)
+    checkout = await asyncio.to_thread(payments.get_checkout, checkout_id)
     if not checkout:
         return JSONResponse({"authenticated": False, "pending": True}, status_code=202)
     metadata = checkout.get("metadata") or {}
@@ -489,7 +495,8 @@ async def start_session(request: Request, checkout_id: str = Form(...)):
     )
     _event("dashboard_session_start", email=True)
     resp = JSONResponse({"authenticated": True, "email": email})
-    _set_session_cookie(resp, request, email)
+    if not _set_session_cookie(resp, request, email):
+        return JSONResponse({"authenticated": False, "unavailable": True})
     return resp
 
 
@@ -535,10 +542,12 @@ async def me(request: Request):
         if job.paid and job.download_token:
             item["downloads"] = {k: _download_url(job, k, job.download_token) for k in job.paid_outputs}
         recent.append(item)
+    # _plan_status makes a blocking Polar call; keep it off the event loop.
+    plan = await asyncio.to_thread(_plan_status, storage.subscriber_record(email))
     return {
         "authenticated": True,
         "email": email,
-        "plan": _plan_status(storage.subscriber_record(email)),
+        "plan": plan,
         "books": {"count": len(jobs), "recent": recent},
         "capabilities": engine.capabilities(),
     }
@@ -556,13 +565,15 @@ async def billing_portal(request: Request):
     rec = storage.subscriber_record(email)
     customer_id = rec.get("customer_id")
     if not customer_id and rec.get("subscription_id"):
-        sub = payments.get_subscription(rec["subscription_id"]) or {}
+        sub = await asyncio.to_thread(payments.get_subscription, rec["subscription_id"]) or {}
         customer_id = sub.get("customer_id")
         if customer_id:
             storage.mark_subscriber_active(email, customer_id=customer_id)
     if not customer_id:
         raise HTTPException(409, "No billing account is linked to this email yet.")
-    url = payments.create_customer_portal_url(customer_id, return_url=f"{config.PUBLIC_URL}/dashboard")
+    url = await asyncio.to_thread(
+        payments.create_customer_portal_url, customer_id, f"{config.PUBLIC_URL}/dashboard"
+    )
     if not url:
         raise HTTPException(502, "Couldn't open the billing portal. Please try again shortly.")
     return {"url": url}

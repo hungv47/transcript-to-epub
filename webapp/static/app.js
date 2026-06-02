@@ -53,12 +53,15 @@ function renderPlanPrice(period, animate) {
   const periodEl = document.getElementById("plan-period");
   const monthly = CONFIG.price_cents;
   const annual = CONFIG.price_annual_cents;
-  const yearly = !!annual && period === "yearly";
+  // Offer yearly only when an annual *product* exists; price_annual_cents is a
+  // display default and is always truthy, so gating on it would route a
+  // "Yearly" pick to the monthly product in a monthly-only deployment.
+  const yearly = !!CONFIG.annual_enabled && period === "yearly";
   const toCents = yearly ? annual : monthly;
   if (periodEl) periodEl.textContent = yearly ? "/year" : "/month";
 
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (!animate || reduce || !annual) {
+  if (!animate || reduce || !CONFIG.annual_enabled) {
     cancelAnimationFrame(priceAnimId);
     if (priceEl) priceEl.textContent = money(toCents, CONFIG.currency);
     return;
@@ -122,6 +125,14 @@ async function loadConfig() {
     if (CONFIG.price_annual_cents) {
       const ann = document.getElementById("price-annual");
       if (ann) ann.textContent = money(CONFIG.price_annual_cents, CONFIG.currency);
+    }
+    // No annual product → hide the billing toggle so "Yearly" can't be picked
+    // (it would route to the monthly product). Force the monthly view.
+    if (!CONFIG.annual_enabled) {
+      const wrap = document.querySelector(".bill-toggle-wrap");
+      if (wrap) wrap.hidden = true;
+      const monthlyRadio = document.getElementById("bill-monthly");
+      if (monthlyRadio) monthlyRadio.checked = true;
     }
     renderPlanPrice(selectedBilling());
     if (CONFIG.capabilities && CONFIG.capabilities.epub === false) {

@@ -69,13 +69,22 @@ DMCA_EMAIL = os.environ.get("DMCA_EMAIL", "dmca@talktobook.example")
 # verified email — no passwords, no DB. Falls back to the Polar webhook secret
 # (stable + secret) so dashboards survive restarts without extra config; set
 # SESSION_SECRET explicitly in production for isolation from the webhook key.
+_DEV_SESSION_SECRET = "t2b-dev-session-secret-change-me"
 SESSION_SECRET = (
     os.environ.get("SESSION_SECRET", "").strip()
     or POLAR_WEBHOOK_SECRET
     or POLAR_ACCESS_TOKEN
-    or "t2b-dev-session-secret-change-me"
+    or _DEV_SESSION_SECRET
 )
 SESSION_TTL_DAYS = int(os.environ.get("SESSION_TTL_DAYS", "60"))
+
+
+def session_secret_configured() -> bool:
+    """True only when SESSION_SECRET comes from a real secret, not the shipped
+    dev default. The dashboard refuses to sign or trust cookies otherwise, so a
+    cookie signed with the public constant can never authenticate a forged
+    session (fail closed)."""
+    return SESSION_SECRET != _DEV_SESSION_SECRET
 
 # Input guardrails.
 MAX_TRANSCRIPT_CHARS = int(os.environ.get("MAX_TRANSCRIPT_CHARS", str(800_000)))
