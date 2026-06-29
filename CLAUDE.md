@@ -6,7 +6,7 @@ original creators by name, and claims no copyright over the source.
 
 Runs three ways: a **standalone Python script**, a **Claude Code skill** (`SKILL.md`), and a
 **web app** (`webapp/`, deployed on Railway — `railway.json`). Code-only repo (experimental); no
-`../_ops/` business folder yet.
+`ops/` business folder yet.
 
 ## Run
 
